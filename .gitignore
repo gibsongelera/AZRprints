@@ -1,0 +1,21 @@
+# Ignore everything by default
+/*
+
+# Keep this gitignore file and .git directory
+!.gitignore
+!/.gitignore
+!/.git
+
+# Allow only the allowed top-level directories and files
+!/admin/
+!/admin/**
+!/assets/
+!/assets/**
+!/scripts/
+!/scripts/**
+!/user/
+!/user/**
+!/index.html
+!/login.html
+!/signup.html
+

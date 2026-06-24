@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+  <meta name="theme-color" content="#020617"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+  <title>Sign Up – AZR PRINT'S</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet"/>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"/>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet"/>
+  <link rel="stylesheet" href="./css/printport.css"/>
+</head>
+
+<body class="auth-page">
+
+<nav class="auth-topbar">
+  <div class="container-fluid d-flex align-items-center gap-3">
+    <span class="brand-logo"><img src="./assets/azr-prints-logo.png" alt="AZR PRINT'S" class="brand-logo-img"/></span>
+    <div>
+      <div class="brand-title fw-bold fs-5" data-brand-name>AZR PRINT'S</div>
+      <small class="text-white-50">ZPPSU Printing Services</small>
+    </div>
+  </div>
+</nav>
+<div class="auth-body flex-grow-1">
+  <div class="container-fluid h-100">
+    <div class="row h-100 g-0">
+      <div class="col-lg-5 auth-hero d-none d-lg-flex flex-column justify-content-center p-5">
+        <h2 class="display-6 fw-bold">Join AZR PRINT'S</h2>
+        <p class="lead opacity-75">Register with your ZPPSU email to submit print jobs online.</p>
+      </div>
+      <div class="col-lg-7 d-flex align-items-center justify-content-center p-4 p-md-5 bg-white">
+        <div class="w-100" style="max-width:440px">
+          <h2 class="h3 fw-bold mb-1">Create Account</h2>
+          <p class="text-muted mb-4">For demo, use the login accounts or fill the form below.</p>
+          <div id="signupError" class="alert alert-danger d-none"></div>
+          <div id="signupSuccess" class="alert alert-success d-none"></div>
+          <form id="signupForm">
+            <div class="mb-3"><label class="form-label">Full Name</label><input class="form-control" id="fullName" required/></div>
+            <div class="mb-3"><label class="form-label">ZPPSU ID</label><input class="form-control" id="universityId" placeholder="ZPPSU-2024-0000" required/></div>
+            <div class="mb-3"><label class="form-label">University Email</label><input class="form-control" id="email" type="email" required/></div>
+            <div class="mb-3"><label class="form-label">Password</label><input class="form-control" id="password" type="password" required/></div>
+            <button class="btn btn-primary w-100 py-2" type="submit">Create Account</button>
+          </form>
+          <p class="text-center text-muted mt-4 mb-0">Already registered? <a href="login.html">Log in here</a></p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="./js/seed.js"></script>
+  <script src="./js/store.js"></script>
+  <script src="./js/format.js"></script>
+  <script src="./js/auth.js"></script>
+  <script src="./js/branding.js"></script>
+  
+  <script src="./js/pages/signup.js"></script>
+
+</body>
+</html>
