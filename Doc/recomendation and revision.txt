@@ -1,0 +1,10 @@
+*web app for system
+*papercut
+*printix
+*universal print Microsoft
+*all are paid subscription
+*auto count number of pages
+*add catergory payment like gcash, maya or instapay
+* Must have chat box accepted email file to show the payment code
+* Must have informations for printer setting
+* Title: An Online Printing Services management system: Design and Implementation

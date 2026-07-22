@@ -1,0 +1,158 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
+  <meta http-equiv="Pragma" content="no-cache"/>
+  <meta http-equiv="Expires" content="0"/>
+  <meta name="theme-color" content="#020617"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+  <title>New Order</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet"/>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"/>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet"/>
+  <link rel="stylesheet" href="../css/printport.css?v=20260710d"/>
+</head>
+
+<body>
+<div class="app-shell">
+<aside id="appSidebar" class="app-sidebar">
+  <div class="p-3 border-bottom border-light border-opacity-25">
+    <a href="dashboard.html" class="text-white text-decoration-none d-flex align-items-center gap-2">
+      <span class="brand-logo"><img src="../assets/azr-prints-logo.png" alt="AZR PRINT'S" class="brand-logo-img"/></span>
+      <div>
+        <div class="brand-title fw-bold" data-brand-name>AZR PRINT'S</div>
+        <small class="text-white-50" data-brand-tagline>Student Portal</small>
+      </div>
+    </a>
+  </div>
+  <nav class="nav flex-column py-2">
+    <a class="nav-link" href="dashboard.html" data-nav-link><i class="bi bi-plus-square"></i> New Order</a>
+    <a class="nav-link" href="orders.html" data-nav-link><i class="bi bi-receipt"></i> My Orders</a>
+    <a class="nav-link" href="profile.html" data-nav-link><i class="bi bi-person"></i> Profile</a>
+    <a class="nav-link mt-2" href="#" data-logout><i class="bi bi-box-arrow-right"></i> Logout</a>
+  </nav>
+</aside>
+<div id="sidebarBackdrop" class="sidebar-backdrop"></div>
+<nav class="mobile-bottom-nav d-lg-none" aria-label="Main navigation">
+  <a href="dashboard.html" class="mobile-nav-link" data-nav-link><i class="bi bi-plus-square"></i><span>New Order</span></a>
+  <a href="orders.html" class="mobile-nav-link" data-nav-link><i class="bi bi-receipt"></i><span>Orders</span></a>
+  <a href="profile.html" class="mobile-nav-link" data-nav-link><i class="bi bi-person"></i><span>Profile</span></a>
+</nav>
+
+<div class="app-main">
+<header class="app-topbar d-flex align-items-center justify-content-between">
+  <div class="d-flex align-items-center gap-3">
+    <button type="button" class="btn btn-light d-lg-none" id="sidebarToggle" aria-label="Menu"><i class="bi bi-list fs-4"></i></button>
+    <h1 class="h5 mb-0 fw-semibold text-primary-dark">New Order</h1>
+  </div>
+  <div class="d-flex align-items-center gap-2">
+    <span class="d-none d-sm-inline text-muted small" data-session-name>Student</span>
+    <span class="badge rounded-pill bg-primary" data-session-initials>JD</span>
+  </div>
+</header>
+
+<main class="app-content">
+
+<div class="row g-4">
+  <div class="col-lg-8">
+    <div class="upload-zone mb-4" id="uploadZone">
+      <input type="file" id="fileInput" class="d-none" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"/>
+      <i class="bi bi-cloud-upload display-4 text-primary"></i>
+      <h3 class="h5 mt-2">Drag & drop your document or click to browse</h3>
+      <p class="text-muted mb-2" id="fileLabel">PDF, DOCX, JPG supported</p>
+      <div><span class="badge bg-danger me-1">PDF</span><span class="badge bg-primary me-1">DOCX</span><span class="badge bg-success">JPG</span></div>
+    </div>
+    <div class="card mb-4"><div class="card-body">
+      <h3 class="h6 fw-semibold mb-3">Printing Type</h3>
+      <div class="row g-2" id="printTypeGroup">
+        <div class="col-4"><button type="button" class="btn btn-outline-primary w-100 active" data-type="document">Document<br><small id="rateDoc">₱2.00/page</small></button></div>
+        <div class="col-4"><button type="button" class="btn btn-outline-primary w-100" data-type="photo">Photo<br><small id="ratePhoto">₱10.00</small></button></div>
+        <div class="col-4"><button type="button" class="btn btn-outline-primary w-100" data-type="large">Large<br><small id="rateLarge">₱50.00</small></button></div>
+      </div>
+    </div></div>
+    <div class="card"><div class="card-body">
+      <h3 class="h6 fw-semibold mb-3">Job Specifications</h3>
+      <div class="row g-3">
+        <div class="col-md-4"><label class="form-label">Paper Size</label><select class="form-select" id="paperSize"><option>A4</option><option>Letter</option><option>Legal</option></select></div>
+        <div class="col-md-4"><label class="form-label">Color</label><select class="form-select" id="colorMode"><option value="bw">Black & White</option><option value="color">Color</option></select></div>
+        <div class="col-md-4"><label class="form-label">Copies</label><input type="number" class="form-control" id="copies" min="1" value="1"/></div>
+        <div class="col-md-4"><label class="form-label">Pages <small class="text-muted fw-normal" id="pageCountHint"></small></label><input type="number" class="form-control" id="pageCount" min="1" value="1"/></div>
+      </div>
+    </div></div>
+    <div class="card" id="paymentCard"><div class="card-body">
+      <div class="d-flex align-items-center justify-content-between mb-1">
+        <h3 class="h6 fw-semibold mb-0"><i class="bi bi-credit-card me-1"></i> Payment · InstaPay / GCash</h3>
+        <span class="payment-config-badge incomplete" id="payConfigBadge">Checking…</span>
+      </div>
+      <div class="gcash-details">
+        <p class="small text-muted mb-2" id="payAccountDisplay"></p>
+        <label class="form-label"><i class="bi bi-qr-code me-1"></i> Scan QR to pay</label>
+        <div class="qr-scan-box mb-3">
+          <img id="checkoutQr" alt="Payment QR" hidden/>
+          <div class="qr-scan-empty" id="checkoutQrEmpty"><i class="bi bi-qr-code"></i><span>QR not configured yet</span></div>
+          <p class="qr-scan-caption">Scan with your GCash / InstaPay app</p>
+        </div>
+        <label class="form-label"><i class="bi bi-phone me-1"></i> InstaPay / GCash number</label>
+        <div class="gcash-number-display mb-3">
+          <span class="number" id="payNumberDisplay">—</span>
+          <button type="button" class="copy-btn" id="copyNumberBtn"><i class="bi bi-clipboard"></i> Copy</button>
+        </div>
+        <label class="form-label"><i class="bi bi-hash me-1"></i> Payment reference (Order ID)</label>
+        <div class="order-ref-box mb-3">
+          <span class="order-ref-id" id="orderRefDisplay">Upload a document to generate</span>
+          <button type="button" class="copy-btn" id="copyOrderRefBtn" disabled><i class="bi bi-clipboard"></i> Copy</button>
+        </div>
+        <p class="gcash-note mb-3"><i class="bi bi-info-circle me-1"></i> Enter this Order ID as the payment reference in your banking app.</p>
+        <label class="form-label"><i class="bi bi-receipt me-1"></i> Upload receipt <span class="text-danger">*</span></label>
+        <div class="receipt-zone-inline" id="receiptZone" role="button" tabindex="0">
+          <i class="bi bi-cloud-upload"></i>
+          <span id="receiptLabel">Upload InstaPay / GCash confirmation screenshot</span>
+        </div>
+        <input type="file" id="receiptInput" class="d-none" accept="image/png,image/jpeg,image/webp"/>
+        <div class="receipt-preview-box-inline d-none" id="receiptPreview">
+          <img id="receiptPreviewImg" alt="Receipt preview"/>
+          <button type="button" class="receipt-clear" id="receiptClear" aria-label="Remove receipt"><i class="bi bi-x-lg"></i></button>
+        </div>
+      </div>
+      <label class="checkbox-wrap mt-3">
+        <input type="checkbox" id="agreeTerms"/>
+        <span>I agree to the <a href="#">Terms of Service</a> &amp; <a href="#">Privacy Policy</a>.</span>
+      </label>
+    </div></div>
+  </div>
+  <div class="col-lg-4">
+    <div class="card sticky-summary sticky-top" style="top:5rem"><div class="card-body">
+      <h3 class="h6 fw-semibold mb-3">Order Summary</h3>
+      <dl class="row small mb-0">
+        <dt class="col-6 text-muted">Subtotal</dt><dd class="col-6 text-end" id="sumSubtotal">₱0.00</dd>
+        <dt class="col-6 text-muted">Copies</dt><dd class="col-6 text-end" id="sumCopies">×1</dd>
+        <dt class="col-6 fw-bold">Total</dt><dd class="col-6 text-end fw-bold text-primary" id="sumTotal">₱0.00</dd>
+      </dl>
+      <button class="btn btn-primary w-100 mt-3" id="submitOrder" disabled>Submit Print Order</button>
+      <p class="ssl-note text-muted small mt-2 mb-0"><i class="bi bi-shield-lock"></i> SSL encrypted &amp; secure</p>
+      <p class="text-muted small mt-2 mb-0" id="orderHint"></p>
+    </div></div>
+  </div>
+</div>
+</main>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="../js/seed.js?v=20260710d"></script>
+  <script src="../js/store.js?v=20260710d"></script>
+  <script src="../js/format.js?v=20260710d"></script>
+  <script src="../js/auth.js?v=20260710d"></script>
+    <script>PrintPortAuth.requireRole('user');</script><script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+  <script src="../js/page-count.js?v=20260710d"></script>
+  <script src="../js/pages/user-dashboard.js?v=20260710d"></script>
+  <script src="../js/branding.js?v=20260710d"></script>
+  <script src="../js/app.js?v=20260710d"></script>
+
+</div>
+</div>
+</body>
+</html>
