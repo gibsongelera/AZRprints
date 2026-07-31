@@ -11,14 +11,17 @@ type NavItem = { href: string; label: string };
 const TITLE_MAP: Record<string, string> = {
   "/admin/dashboard": "Dashboard",
   "/admin/orders": "Manage Orders",
+  "/admin/files": "Order Files",
   "/admin/users": "Manage Users",
   "/admin/pricing": "Pricing",
   "/admin/printer": "Printer",
+  "/admin/tickets": "Tickets",
   "/admin/notifications": "Notifications",
   "/admin/settings": "Settings",
   "/admin/profile": "Profile",
   "/user/dashboard": "New Order",
   "/user/orders": "My Orders",
+  "/user/tickets": "Support",
   "/user/profile": "Profile",
 };
 
@@ -39,9 +42,11 @@ export function AppShell({
   const adminNav: NavItem[] = [
     { href: "/admin/dashboard", label: "Dashboard" },
     { href: "/admin/orders", label: "Manage Orders" },
+    { href: "/admin/files", label: "Order Files" },
     { href: "/admin/users", label: "Manage Users" },
     { href: "/admin/pricing", label: "Pricing" },
     { href: "/admin/printer", label: "Printer" },
+    { href: "/admin/tickets", label: "Tickets" },
     { href: "/admin/notifications", label: "Notifications" },
     { href: "/admin/settings", label: "Settings" },
     { href: "/admin/profile", label: "Profile" },
@@ -50,6 +55,7 @@ export function AppShell({
   const userNav: NavItem[] = [
     { href: "/user/dashboard", label: "New Order" },
     { href: "/user/orders", label: "My Orders" },
+    { href: "/user/tickets", label: "Support" },
     { href: "/user/profile", label: "Profile" },
   ];
 
@@ -103,7 +109,8 @@ export function AppShell({
         </div>
         <nav className="flex flex-col py-3 gap-0.5 px-2">
           {nav.map((item) => {
-            const active = pathname === item.href;
+            const active =
+              pathname === item.href || pathname.startsWith(`${item.href}/`);
             return (
               <Link
                 key={item.href}

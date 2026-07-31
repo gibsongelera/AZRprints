@@ -1,6 +1,6 @@
 export type UserRole = "admin" | "user";
 
-export type OrderType = "document" | "photo" | "large";
+export type OrderType = "document" | "photo";
 export type OrderColor = "bw" | "color";
 export type OrderStatus = "pending" | "in_progress" | "completed" | "cancelled";
 export type PaymentStatus = "pending" | "paid" | "failed";
@@ -96,5 +96,33 @@ export interface Notification {
   type: string;
   title: string;
   message: string;
+  created_at: string;
+}
+
+export type TicketCategory =
+  | "order_issue"
+  | "payment"
+  | "printer"
+  | "report"
+  | "general";
+export type TicketStatus = "open" | "in_progress" | "resolved" | "closed";
+
+export interface Ticket {
+  id: string;
+  user_id: string;
+  subject: string;
+  category: TicketCategory;
+  status: TicketStatus;
+  created_at: string;
+  updated_at: string;
+  profiles?: Pick<Profile, "name" | "student_id" | "email"> | null;
+}
+
+export interface TicketMessage {
+  id: string;
+  ticket_id: string;
+  sender_id: string;
+  sender_role: "user" | "admin";
+  body: string;
   created_at: string;
 }

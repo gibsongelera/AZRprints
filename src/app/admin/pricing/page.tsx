@@ -7,7 +7,6 @@ export default function AdminPricingPage() {
   const [documentBw, setDocumentBw] = useState("2");
   const [documentColor, setDocumentColor] = useState("5");
   const [photo, setPhoto] = useState("10");
-  const [largeFormat, setLargeFormat] = useState("50");
   const [binding, setBinding] = useState("25");
   const [msg, setMsg] = useState("");
   const [error, setError] = useState("");
@@ -24,7 +23,6 @@ export default function AdminPricingPage() {
         setDocumentBw(String(data.document_bw));
         setDocumentColor(String(data.document_color));
         setPhoto(String(data.photo));
-        setLargeFormat(String(data.large_format));
         setBinding(String(data.binding));
       });
   }, []);
@@ -40,7 +38,6 @@ export default function AdminPricingPage() {
         document_bw: Number(documentBw),
         document_color: Number(documentColor),
         photo: Number(photo),
-        large_format: Number(largeFormat),
         binding: Number(binding),
       }),
     });
@@ -61,7 +58,6 @@ export default function AdminPricingPage() {
         ["Document B&W / page", documentBw, setDocumentBw],
         ["Document Color / page", documentColor, setDocumentColor],
         ["Photo (per print)", photo, setPhoto],
-        ["Large format", largeFormat, setLargeFormat],
         ["Binding", binding, setBinding],
       ].map(([label, value, setter]) => (
         <div key={label as string}>

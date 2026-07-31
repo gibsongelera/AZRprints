@@ -31,7 +31,6 @@ export async function PUT(request: Request) {
       document_bw: Number(body.document_bw),
       document_color: Number(body.document_color),
       photo: Number(body.photo),
-      large_format: Number(body.large_format),
       binding: Number(body.binding),
       updated_at: new Date().toISOString(),
     })

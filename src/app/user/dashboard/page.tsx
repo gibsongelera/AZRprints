@@ -150,7 +150,7 @@ export default function UserDashboardPage() {
 
   return (
     <div className="max-w-3xl space-y-4">
-      <div className="grid sm:grid-cols-3 gap-3">
+      <div className="grid sm:grid-cols-2 gap-3">
         <div className="rounded-xl border border-pp-border bg-white p-4">
           <div className="text-xs text-pp-muted">Document B&W</div>
           <div className="font-semibold">
@@ -163,18 +163,12 @@ export default function UserDashboardPage() {
             {pricing ? formatPHP(pricing.photo) : "—"}
           </div>
         </div>
-        <div className="rounded-xl border border-pp-border bg-white p-4">
-          <div className="text-xs text-pp-muted">Large format</div>
-          <div className="font-semibold">
-            {pricing ? formatPHP(pricing.large_format) : "—"}
-          </div>
-        </div>
       </div>
 
       <div className="rounded-xl border border-pp-border bg-white p-5 space-y-4">
         <h2 className="font-semibold">Printing Type</h2>
-        <div className="grid grid-cols-3 gap-2">
-          {(["document", "photo", "large"] as OrderType[]).map((t) => (
+        <div className="grid grid-cols-2 gap-2">
+          {(["document", "photo"] as OrderType[]).map((t) => (
             <button
               key={t}
               type="button"
@@ -185,7 +179,7 @@ export default function UserDashboardPage() {
                   : "border-pp-border"
               }`}
             >
-              {t === "large" ? "Large format" : t}
+              {t}
             </button>
           ))}
         </div>
@@ -239,14 +233,16 @@ export default function UserDashboardPage() {
 
         <div>
           <label className="block text-sm mb-1">Upload file (PDF, DOCX, images)</label>
-          <input
-            type="file"
-            accept=".pdf,.doc,.docx,image/*"
-            className="w-full text-sm"
-            onChange={(e) => onFileChange(e.target.files?.[0] || null)}
-          />
+          <div className="w-full min-h-11 rounded-lg border border-pp-border bg-white px-3 py-2.5">
+            <input
+              type="file"
+              accept=".pdf,.doc,.docx,image/*"
+              className="w-full text-sm file:mr-3 file:rounded-md file:border-0 file:bg-pp-accent file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-white file:cursor-pointer cursor-pointer"
+              onChange={(e) => onFileChange(e.target.files?.[0] || null)}
+            />
+          </div>
           {file && (
-            <p className="text-xs text-pp-muted mt-1">
+            <p className="text-xs text-pp-muted mt-2">
               {file.name} · {(file.size / 1024).toFixed(1)} KB
               {analyzing ? " · analyzing…" : ""}
             </p>

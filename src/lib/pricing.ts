@@ -40,18 +40,6 @@ export function calculateOrderBreakdown(
     return { lines, total: lines[0].subtotal };
   }
 
-  if (type === "large") {
-    const unit = Number(pricing.large_format);
-    lines.push({
-      key: "large",
-      label: "Large format",
-      quantity: c,
-      unitPrice: unit,
-      subtotal: unit * c,
-    });
-    return { lines, total: lines[0].subtotal };
-  }
-
   const docRate =
     color === "color"
       ? Number(pricing.document_color)

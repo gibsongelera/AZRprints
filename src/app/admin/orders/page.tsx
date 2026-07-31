@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { OrderFileActions } from "@/components/OrderFileActions";
 import { formatPHP } from "@/lib/format";
 import { createClient } from "@/lib/supabase/client";
 import type { Order, OrderStatus } from "@/lib/types";
@@ -22,9 +23,7 @@ export default function AdminOrdersPage() {
   }
 
   useEffect(() => {
-    void (async () => {
-      await load();
-    })();
+    void load();
   }, []);
 
   async function updateStatus(id: string, status: OrderStatus) {
@@ -60,6 +59,7 @@ export default function AdminOrdersPage() {
               <th className="px-3 py-2">Amount</th>
               <th className="px-3 py-2">Payment</th>
               <th className="px-3 py-2">Job status</th>
+              <th className="px-3 py-2">File actions</th>
             </tr>
           </thead>
           <tbody>
@@ -69,7 +69,11 @@ export default function AdminOrdersPage() {
                 <td className="px-3 py-2">
                   {(o.profiles as { name?: string } | null)?.name || "—"}
                 </td>
-                <td className="px-3 py-2 max-w-[180px] truncate">{o.file_name}</td>
+                <td className="px-3 py-2 max-w-[180px] truncate" title={o.file_name}>
+                  {o.file_path ? o.file_name : (
+                    <span className="text-pp-muted italic">No file</span>
+                  )}
+                </td>
                 <td className="px-3 py-2">{formatPHP(o.amount)}</td>
                 <td className="px-3 py-2">{o.payment_status}</td>
                 <td className="px-3 py-2">
@@ -86,11 +90,27 @@ export default function AdminOrdersPage() {
                     <option value="cancelled">cancelled</option>
                   </select>
                 </td>
+                <td className="px-3 py-2">
+                  <OrderFileActions
+                    orderId={o.id}
+                    fileName={o.file_name}
+                    hasFile={!!o.file_path}
+                    compact
+                    onDeleted={() =>
+                      setOrders((prev) =>
+                        prev.map((row) =>
+                          row.id === o.id ? { ...row, file_path: null } : row
+                        )
+                      )
+                    }
+                    onReplaced={() => void load()}
+                  />
+                </td>
               </tr>
             ))}
             {!orders.length && (
               <tr>
-                <td colSpan={6} className="px-3 py-8 text-center text-pp-muted">
+                <td colSpan={7} className="px-3 py-8 text-center text-pp-muted">
                   No orders
                 </td>
               </tr>

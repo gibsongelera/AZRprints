@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { OrderFileActions } from "@/components/OrderFileActions";
 import { formatPHP } from "@/lib/format";
 import { createClient } from "@/lib/supabase/client";
 import type { Order } from "@/lib/types";
@@ -227,44 +228,63 @@ export default function UserOrdersPage() {
       {orders.map((o) => (
         <div
           key={o.id}
-          className="rounded-xl border border-pp-border bg-white p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+          className="rounded-xl border border-pp-border bg-white p-4 flex flex-col gap-3"
         >
-          <div>
-            <div className="font-semibold">{o.id}</div>
-            <div className="text-sm text-pp-muted">{o.file_name}</div>
-            <div className="text-xs text-pp-muted mt-1">
-              {o.pages} page(s) · {o.copies} copy · {o.type}/{o.color}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <div className="font-semibold">{o.id}</div>
+              <div className="text-sm text-pp-muted">
+                {o.file_path ? o.file_name : "No file uploaded"}
+              </div>
+              <div className="text-xs text-pp-muted mt-1">
+                {o.pages} page(s) · {o.copies} copy · {o.type}/{o.color}
+              </div>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className={`text-xs font-medium px-2 py-1 rounded-full ${badge(o.status)}`}>
+                {o.status}
+              </span>
+              <span
+                className={`text-xs font-medium px-2 py-1 rounded-full ${badge(o.payment_status)}`}
+              >
+                pay: {o.payment_status}
+              </span>
+              <span className="font-semibold text-pp-accent">{formatPHP(o.amount)}</span>
+              {o.payment_status !== "paid" && (
+                <>
+                  <button
+                    type="button"
+                    disabled={confirming}
+                    onClick={() => refreshConfirm(o.id)}
+                    className="min-h-9 rounded-lg border border-pp-border bg-white text-sm px-3 font-medium disabled:opacity-50"
+                  >
+                    Check payment
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => payAgain(o.id)}
+                    className="min-h-9 rounded-lg bg-pp-accent text-white text-sm px-3 font-medium"
+                  >
+                    Pay now
+                  </button>
+                </>
+              )}
             </div>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <span className={`text-xs font-medium px-2 py-1 rounded-full ${badge(o.status)}`}>
-              {o.status}
-            </span>
-            <span
-              className={`text-xs font-medium px-2 py-1 rounded-full ${badge(o.payment_status)}`}
-            >
-              pay: {o.payment_status}
-            </span>
-            <span className="font-semibold text-pp-accent">{formatPHP(o.amount)}</span>
-            {o.payment_status !== "paid" && (
-              <>
-                <button
-                  type="button"
-                  disabled={confirming}
-                  onClick={() => refreshConfirm(o.id)}
-                  className="min-h-9 rounded-lg border border-pp-border bg-white text-sm px-3 font-medium disabled:opacity-50"
-                >
-                  Check payment
-                </button>
-                <button
-                  type="button"
-                  onClick={() => payAgain(o.id)}
-                  className="min-h-9 rounded-lg bg-pp-accent text-white text-sm px-3 font-medium"
-                >
-                  Pay now
-                </button>
-              </>
-            )}
+          <div className="border-t border-pp-border pt-3">
+            <OrderFileActions
+              orderId={o.id}
+              fileName={o.file_name}
+              hasFile={!!o.file_path}
+              onDeleted={() =>
+                setOrders((prev) =>
+                  prev.map((row) =>
+                    row.id === o.id ? { ...row, file_path: null } : row
+                  )
+                )
+              }
+              onReplaced={() => void loadOrders()}
+            />
           </div>
         </div>
       ))}

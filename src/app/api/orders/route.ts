@@ -48,7 +48,7 @@ export async function POST(request: Request) {
   if (file.type && !ALLOWED.has(file.type)) {
     return NextResponse.json({ error: "Unsupported file type" }, { status: 400 });
   }
-  if (!["document", "photo", "large"].includes(type)) {
+  if (!["document", "photo"].includes(type)) {
     return NextResponse.json({ error: "Invalid print type" }, { status: 400 });
   }
   if (!["bw", "color"].includes(color)) {
