@@ -68,7 +68,8 @@ Open [http://localhost:3000](http://localhost:3000).
 
 1. Open that Supabase project → **SQL Editor**.
 2. Paste and run the full script in [`supabase/migrations/001_initial.sql`](supabase/migrations/001_initial.sql).
-3. Confirm tables exist: `profiles`, `pricing`, `shop_settings`, `orders`, `notifications`.
+3. Run [`supabase/migrations/002_print_queue.sql`](supabase/migrations/002_print_queue.sql) for print queue and mixed-content order fields.
+4. Confirm tables exist: `profiles`, `pricing`, `shop_settings`, `orders`, `notifications`, `print_jobs`, `printer_settings`.
 4. Confirm Storage bucket `order-files` exists (private).
 
 ### Auth URL configuration (local)
@@ -162,12 +163,25 @@ In Vercel → Project → **Settings** → **Environment Variables**, add for **
 
 ### F. Wire Supabase Auth URLs (production)
 
+Confirmation and password-reset emails use **Site URL** + your app’s `emailRedirectTo`.
+If Site URL is still `http://localhost:3000`, every email will open localhost.
+
 Supabase → Authentication → URL Configuration:
 
-- Site URL: `https://your-app.vercel.app`
-- Redirect URLs include:
-  - `https://your-app.vercel.app/**`
+- **Site URL:** `https://azrprinting.vercel.app`
+- **Redirect URLs** (add all):
+  - `https://azrprinting.vercel.app/**`
+  - `https://azrprinting.vercel.app/auth/callback`
   - `http://localhost:3000/**`
+  - `http://localhost:3000/auth/callback`
+
+On Vercel → Environment Variables, set:
+
+```env
+NEXT_PUBLIC_APP_URL=https://azrprinting.vercel.app
+```
+
+Then **Redeploy** so signup / forgot-password emails point at your live site ([azrprinting.vercel.app](https://azrprinting.vercel.app/login)).
 
 ## 5. Post-deploy checklist
 

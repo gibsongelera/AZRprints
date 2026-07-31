@@ -30,7 +30,10 @@ export async function updateSession(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const path = request.nextUrl.pathname;
-  const isAuthPage = path === "/login" || path === "/signup";
+  const isAuthPage =
+    path === "/login" ||
+    path === "/signup" ||
+    path === "/forgot-password";
   const isAdminRoute = path.startsWith("/admin");
   const isUserRoute = path.startsWith("/user");
   const isProtected = isAdminRoute || isUserRoute;
@@ -42,6 +45,7 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
+  // Allow recovery session to stay on /reset-password (not treated as auth bounce).
   if (user && isAuthPage) {
     const { data: profile } = await supabase
       .from("profiles")

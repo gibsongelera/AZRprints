@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { getSiteUrl } from "@/lib/site-url";
 
 export default function SignupPage() {
   const router = useRouter();
@@ -14,17 +15,16 @@ export default function SignupPage() {
   const [studentId, setStudentId] = useState("");
   const [college, setCollege] = useState("");
   const [error, setError] = useState("");
-  const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     setError("");
-    setMessage("");
     setLoading(true);
 
+    const site = getSiteUrl();
     const supabase = createClient();
-    const { data, error: authError } = await supabase.auth.signUp({
+    const { error: authError } = await supabase.auth.signUp({
       email,
       password,
       options: {
@@ -34,7 +34,7 @@ export default function SignupPage() {
           college,
           role: "user",
         },
-        emailRedirectTo: `${window.location.origin}/auth/callback`,
+        emailRedirectTo: `${site}/auth/callback?next=${encodeURIComponent("/login?confirmed=1")}`,
       },
     });
 
@@ -44,16 +44,10 @@ export default function SignupPage() {
       return;
     }
 
-    if (data.session) {
-      router.replace("/user/dashboard");
-      router.refresh();
-      return;
-    }
-
-    setMessage(
-      "Account created. Check your email to confirm, then sign in. If email confirmation is disabled, you can log in now."
+    // Always send users to login with a confirmation notice (no auto-login).
+    router.replace(
+      `/login?registered=1&email=${encodeURIComponent(email.trim())}`,
     );
-    setLoading(false);
   }
 
   return (
@@ -82,11 +76,6 @@ export default function SignupPage() {
           {error && (
             <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
               {error}
-            </div>
-          )}
-          {message && (
-            <div className="mb-4 rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-800">
-              {message}
             </div>
           )}
 

@@ -3,17 +3,33 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { FormEvent, useState } from "react";
+import { FormEvent, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 
 export default function LoginPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState(searchParams.get("email") || "");
   const [password, setPassword] = useState("");
   const [showPw, setShowPw] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState(searchParams.get("error") || "");
   const [loading, setLoading] = useState(false);
+
+  const notice = useMemo(() => {
+    if (searchParams.get("registered") === "1") {
+      return "Account created. Check your email for a confirmation link, then sign in here.";
+    }
+    if (searchParams.get("confirmed") === "1") {
+      return "Email confirmed. You can sign in now.";
+    }
+    if (searchParams.get("reset") === "1") {
+      return "Password updated. Sign in with your new password.";
+    }
+    if (searchParams.get("forgot") === "1") {
+      return "If that email is registered, we sent a password reset link. Check your inbox.";
+    }
+    return "";
+  }, [searchParams]);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -37,11 +53,11 @@ export default function LoginPage() {
       .maybeSingle();
 
     const redirect = searchParams.get("redirect");
-    if (redirect?.startsWith("/")) {
+    if (redirect?.startsWith("/") && !redirect.startsWith("//")) {
       router.replace(redirect);
     } else {
       router.replace(
-        profile?.role === "admin" ? "/admin/dashboard" : "/user/dashboard"
+        profile?.role === "admin" ? "/admin/dashboard" : "/user/dashboard",
       );
     }
     router.refresh();
@@ -80,6 +96,12 @@ export default function LoginPage() {
             <h2 className="text-2xl font-bold mb-1">Welcome Back</h2>
             <p className="text-pp-muted mb-6">Sign in to manage your print orders.</p>
 
+            {notice && (
+              <div className="mb-4 rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-800">
+                {notice}
+              </div>
+            )}
+
             {error && (
               <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
                 {error}
@@ -103,9 +125,17 @@ export default function LoginPage() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1" htmlFor="password">
-                  Password
-                </label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-sm font-medium" htmlFor="password">
+                    Password
+                  </label>
+                  <Link
+                    href="/forgot-password"
+                    className="text-sm text-pp-accent font-medium underline"
+                  >
+                    Forgot password?
+                  </Link>
+                </div>
                 <div className="flex gap-2">
                   <input
                     id="password"

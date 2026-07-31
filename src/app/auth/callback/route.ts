@@ -1,15 +1,24 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { getSiteUrl, safeNextPath } from "@/lib/site-url";
 
 export async function GET(request: Request) {
-  const { searchParams, origin } = new URL(request.url);
+  const url = new URL(request.url);
+  const { searchParams } = url;
   const code = searchParams.get("code");
-  const next = searchParams.get("next") ?? "/";
+  const next = safeNextPath(searchParams.get("next"), "/");
+  const site = getSiteUrl();
 
   if (code) {
     const supabase = await createClient();
-    await supabase.auth.exchangeCodeForSession(code);
+    const { error } = await supabase.auth.exchangeCodeForSession(code);
+    if (error) {
+      return NextResponse.redirect(
+        `${site}/login?error=${encodeURIComponent(error.message)}`,
+      );
+    }
   }
 
-  return NextResponse.redirect(`${origin}${next}`);
+  // Password recovery lands on reset form; email confirm lands on login.
+  return NextResponse.redirect(`${site}${next}`);
 }

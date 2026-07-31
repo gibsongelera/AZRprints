@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { analyzeUploadContent } from "@/lib/content-analysis";
 import { formatPHP } from "@/lib/format";
-import { detectPageCount } from "@/lib/page-count";
-import { calculateOrderAmount } from "@/lib/pricing";
+import { calculateOrderBreakdown } from "@/lib/pricing";
 import { createClient } from "@/lib/supabase/client";
 import type { OrderColor, OrderType, Pricing } from "@/lib/types";
 
@@ -13,7 +13,10 @@ export default function UserDashboardPage() {
   const [color, setColor] = useState<OrderColor>("bw");
   const [copies, setCopies] = useState(1);
   const [pages, setPages] = useState(1);
+  const [documentPages, setDocumentPages] = useState(0);
+  const [photoPages, setPhotoPages] = useState(0);
   const [pageLabel, setPageLabel] = useState("");
+  const [analyzing, setAnalyzing] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [agree, setAgree] = useState(false);
   const [error, setError] = useState("");
@@ -32,29 +35,52 @@ export default function UserDashboardPage() {
       });
   }, []);
 
-  const amount = useMemo(() => {
-    if (!pricing) return 0;
-    return calculateOrderAmount(pricing, type, color, pages, copies);
-  }, [pricing, type, color, pages, copies]);
+  const breakdown = useMemo(() => {
+    if (!pricing) return null;
+    return calculateOrderBreakdown(
+      pricing,
+      type,
+      color,
+      pages,
+      copies,
+      documentPages,
+      photoPages
+    );
+  }, [pricing, type, color, pages, copies, documentPages, photoPages]);
 
-  async function onFileChange(f: File | null) {
+  const amount = breakdown?.total ?? 0;
+
+  const onFileChange = useCallback(async (f: File | null) => {
     setFile(f);
     setPageLabel("");
     if (!f) {
       setPages(1);
+      setDocumentPages(0);
+      setPhotoPages(0);
       return;
     }
-    setPageLabel("detecting…");
+    setAnalyzing(true);
+    setPageLabel("analyzing…");
     try {
-      const result = await detectPageCount(f);
-      setPages(result.pages);
+      const result = await analyzeUploadContent(f);
+      setPages(result.totalPages);
+      setDocumentPages(result.documentPages);
+      setPhotoPages(result.photoPages);
       setPageLabel(result.label);
-      if (f.type.startsWith("image/")) setType("photo");
+      if (f.type.startsWith("image/") || result.photoPages > result.documentPages) {
+        setType("photo");
+      } else if (result.isMixed) {
+        setType("document");
+      }
     } catch {
       setPages(1);
+      setDocumentPages(1);
+      setPhotoPages(0);
       setPageLabel("default");
+    } finally {
+      setAnalyzing(false);
     }
-  }
+  }, []);
 
   async function submitOrder() {
     setError("");
@@ -67,6 +93,10 @@ export default function UserDashboardPage() {
       setError("Please agree to the terms.");
       return;
     }
+    if (analyzing) {
+      setError("Please wait for file analysis to finish.");
+      return;
+    }
     setLoading(true);
     try {
       const form = new FormData();
@@ -75,6 +105,9 @@ export default function UserDashboardPage() {
       form.append("color", color);
       form.append("pages", String(pages));
       form.append("copies", String(copies));
+      form.append("document_pages", String(documentPages));
+      form.append("photo_pages", String(photoPages));
+      form.append("content_label", pageLabel);
 
       const createRes = await fetch("/api/orders", { method: "POST", body: form });
       const createJson = await createRes.json();
@@ -194,6 +227,16 @@ export default function UserDashboardPage() {
           </div>
         </div>
 
+        {type === "document" && (documentPages > 0 || photoPages > 0) && (
+          <div className="rounded-lg border border-dashed border-pp-border bg-slate-50 p-3 text-sm space-y-1">
+            <div className="font-medium text-pp-muted">Content breakdown</div>
+            <div className="flex flex-wrap gap-3">
+              <span>Text pages: {documentPages}</span>
+              <span>Photo pages: {photoPages}</span>
+            </div>
+          </div>
+        )}
+
         <div>
           <label className="block text-sm mb-1">Upload file (PDF, DOCX, images)</label>
           <input
@@ -205,13 +248,28 @@ export default function UserDashboardPage() {
           {file && (
             <p className="text-xs text-pp-muted mt-1">
               {file.name} · {(file.size / 1024).toFixed(1)} KB
+              {analyzing ? " · analyzing…" : ""}
             </p>
           )}
         </div>
 
-        <div className="rounded-lg bg-slate-50 border border-pp-border p-4 flex items-center justify-between">
-          <span className="font-medium">Estimated total</span>
-          <span className="text-xl font-bold text-pp-accent">{formatPHP(amount)}</span>
+        <div className="rounded-lg bg-slate-50 border border-pp-border p-4 space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="font-medium">Estimated total</span>
+            <span className="text-xl font-bold text-pp-accent">{formatPHP(amount)}</span>
+          </div>
+          {breakdown && breakdown.lines.length > 1 && (
+            <ul className="text-xs text-pp-muted space-y-0.5 border-t border-pp-border pt-2">
+              {breakdown.lines.map((line) => (
+                <li key={line.key} className="flex justify-between gap-2">
+                  <span>
+                    {line.label} × {line.quantity} @ {formatPHP(line.unitPrice)}
+                  </span>
+                  <span>{formatPHP(line.subtotal)}</span>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
 
         <label className="flex items-start gap-2 text-sm">
@@ -240,7 +298,7 @@ export default function UserDashboardPage() {
 
         <button
           type="button"
-          disabled={loading || !file || !agree}
+          disabled={loading || !file || !agree || analyzing}
           onClick={submitOrder}
           className="w-full min-h-11 rounded-lg bg-pp-accent text-white font-semibold hover:bg-[#b91c1c] disabled:opacity-50"
         >

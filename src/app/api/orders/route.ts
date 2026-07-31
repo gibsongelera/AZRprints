@@ -29,6 +29,15 @@ export async function POST(request: Request) {
   const color = String(form.get("color") || "bw") as OrderColor;
   const pages = Math.max(1, parseInt(String(form.get("pages") || "1"), 10) || 1);
   const copies = Math.max(1, parseInt(String(form.get("copies") || "1"), 10) || 1);
+  const documentPages = Math.max(
+    0,
+    parseInt(String(form.get("document_pages") || "0"), 10) || 0
+  );
+  const photoPages = Math.max(
+    0,
+    parseInt(String(form.get("photo_pages") || "0"), 10) || 0
+  );
+  const contentLabel = String(form.get("content_label") || "").slice(0, 200);
 
   if (!(file instanceof File)) {
     return NextResponse.json({ error: "File is required" }, { status: 400 });
@@ -56,7 +65,15 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Pricing not configured" }, { status: 500 });
   }
 
-  const amount = calculateOrderAmount(pricing, type, color, pages, copies);
+  const amount = calculateOrderAmount(
+    pricing,
+    type,
+    color,
+    pages,
+    copies,
+    documentPages,
+    photoPages
+  );
   const orderId = `ORD-${Date.now()}`;
   const safeName = file.name.replace(/[^\w.\-]+/g, "_").slice(0, 120);
   const filePath = `${user.id}/${orderId}-${safeName}`;
@@ -84,6 +101,9 @@ export async function POST(request: Request) {
       file_name: file.name,
       file_path: filePath,
       pages,
+      document_pages: documentPages,
+      photo_pages: photoPages,
+      content_label: contentLabel || null,
       type,
       color,
       copies,

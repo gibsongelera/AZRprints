@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { verifyPaymongoSignature } from "@/lib/paymongo";
+import { enqueuePrintJobForOrder } from "@/lib/print-queue";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
@@ -111,6 +112,8 @@ export async function POST(request: Request) {
       .from("orders")
       .update({ payment_status: "paid", status: "in_progress" })
       .eq("id", order.id);
+
+    await enqueuePrintJobForOrder(admin, order.id);
 
     await admin.from("notifications").insert({
       user_id: null,

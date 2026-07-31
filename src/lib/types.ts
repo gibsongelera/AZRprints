@@ -42,6 +42,9 @@ export interface Order {
   file_name: string;
   file_path: string | null;
   pages: number;
+  document_pages: number;
+  photo_pages: number;
+  content_label: string | null;
   type: OrderType;
   color: OrderColor;
   copies: number;
@@ -52,6 +55,39 @@ export interface Order {
   paymongo_checkout_url: string | null;
   created_at: string;
   profiles?: Pick<Profile, "name" | "student_id" | "email"> | null;
+}
+
+export type PrintJobStatus =
+  | "queued"
+  | "printing"
+  | "completed"
+  | "failed"
+  | "cancelled";
+
+export interface PrintJob {
+  id: string;
+  order_id: string;
+  status: PrintJobStatus;
+  printer_name: string;
+  copies: number;
+  attempts: number;
+  last_error: string | null;
+  locked_by: string | null;
+  locked_at: string | null;
+  completed_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PrinterSettings {
+  id: number;
+  auto_print_enabled: boolean;
+  direct_print_enabled: boolean;
+  default_printer_name: string;
+  poll_interval_seconds: number;
+  max_job_retries: number;
+  spool_retention_hours: number;
+  updated_at: string;
 }
 
 export interface Notification {

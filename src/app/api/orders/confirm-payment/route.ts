@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { isPaymongoResourcePaid } from "@/lib/paymongo";
+import { enqueuePrintJobForOrder } from "@/lib/print-queue";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
@@ -103,6 +105,9 @@ export async function POST(request: Request) {
     if (updateError) {
       return NextResponse.json({ error: updateError.message }, { status: 500 });
     }
+
+    const admin = createAdminClient();
+    await enqueuePrintJobForOrder(admin, order.id);
 
     // Best-effort notification (ignore failure)
     await supabase.from("notifications").insert({
