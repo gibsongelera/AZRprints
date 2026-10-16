@@ -1,7 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { ExportMenu } from "@/components/ExportMenu";
 import { OrderFileActions } from "@/components/OrderFileActions";
+import { useConfirm, useToast } from "@/components/ui/feedback";
+import type { ExportSpec } from "@/lib/export";
 import { formatPHP } from "@/lib/format";
 import { createClient } from "@/lib/supabase/client";
 import type { Order } from "@/lib/types";
@@ -19,6 +22,9 @@ function badge(status: string) {
 }
 
 export default function UserOrdersPage() {
+  const toast = useToast();
+  const confirm = useConfirm();
+  const [busyId, setBusyId] = useState<string | null>(null);
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [confirming, setConfirming] = useState(false);
@@ -143,14 +149,63 @@ export default function UserOrdersPage() {
     try {
       json = text ? JSON.parse(text) : {};
     } catch {
-      alert(`Checkout failed (${res.status}). Restart npm run dev and try again.`);
+      toast.error("Checkout failed", `The server answered ${res.status}. Try again in a moment.`);
       return;
     }
     if (res.ok && json.checkoutUrl) {
+      toast.info("Opening secure checkout…");
       window.location.assign(json.checkoutUrl);
     } else {
-      alert(json.error || "Could not start checkout");
+      toast.error("Couldn't start checkout", json.error);
     }
+  }
+
+  async function cancelOrder(o: Order) {
+    const ok = await confirm({
+      title: `Cancel order ${o.id}?`,
+      message:
+        "The shop won't print it and its payment link will stop working. You can delete the order afterwards.",
+      confirmLabel: "Yes, cancel order",
+      cancelLabel: "No, keep it",
+      tone: "danger",
+    });
+    if (!ok) return;
+    setBusyId(o.id);
+    const res = await fetch(`/api/orders/${o.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: "cancelled" }),
+    });
+    const json = await res.json().catch(() => ({}));
+    setBusyId(null);
+    if (!res.ok) {
+      toast.error("Couldn't cancel the order", json.error);
+      await loadOrders();
+      return;
+    }
+    setOrders((prev) => prev.map((row) => (row.id === o.id ? (json.order as Order) : row)));
+    toast.success("Order cancelled", `${o.id} won't be printed.`);
+  }
+
+  async function deleteOrder(o: Order) {
+    const ok = await confirm({
+      title: `Delete order ${o.id}?`,
+      message: "The order and its uploaded file will be removed from your list. This can't be undone.",
+      confirmLabel: "Delete order",
+      tone: "danger",
+    });
+    if (!ok) return;
+    setBusyId(o.id);
+    const res = await fetch(`/api/orders/${o.id}`, { method: "DELETE" });
+    const json = await res.json().catch(() => ({}));
+    setBusyId(null);
+    if (!res.ok) {
+      toast.error("Couldn't delete the order", json.error);
+      await loadOrders();
+      return;
+    }
+    setOrders((prev) => prev.filter((row) => row.id !== o.id));
+    toast.success("Order deleted", o.id);
   }
 
   async function refreshConfirm(orderId: string) {
@@ -222,9 +277,44 @@ export default function UserOrdersPage() {
     );
   }
 
+  const exportSpec = (): ExportSpec<Order> => ({
+    filename: "my-print-orders",
+    title: "My print orders",
+    sheetName: "Orders",
+    rows: orders,
+    columns: [
+      { header: "Order", value: (o) => o.id, width: 20 },
+      { header: "Date", value: (o) => o.created_at, type: "datetime", width: 18 },
+      { header: "File", value: (o) => o.file_name, width: 32 },
+      { header: "Type", value: (o) => `${o.type}/${o.color}`, width: 14 },
+      { header: "Pages", value: (o) => o.pages, type: "number", width: 8 },
+      { header: "Copies", value: (o) => o.copies, type: "number", width: 8 },
+      { header: "Amount", value: (o) => o.amount, type: "currency", width: 12 },
+      { header: "Payment", value: (o) => (o.payment_status === "pending" ? "unpaid" : o.payment_status), width: 10 },
+      { header: "Status", value: (o) => o.status.replace("_", " "), width: 12 },
+    ],
+    summary: [
+      { label: "Orders", value: String(orders.length) },
+      {
+        label: "Total paid",
+        value: formatPHP(
+          orders
+            .filter((o) => o.payment_status === "paid")
+            .reduce((s, o) => s + Number(o.amount || 0), 0)
+        ),
+      },
+    ],
+  });
+
   return (
     <div className="space-y-3">
       {bannerEl}
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-sm text-pp-muted">
+          {orders.length} order{orders.length === 1 ? "" : "s"}
+        </p>
+        <ExportMenu getSpec={exportSpec} />
+      </div>
       {orders.map((o) => (
         <div
           key={o.id}
@@ -250,7 +340,7 @@ export default function UserOrdersPage() {
                 pay: {o.payment_status}
               </span>
               <span className="font-semibold text-pp-accent">{formatPHP(o.amount)}</span>
-              {o.payment_status !== "paid" && (
+              {o.payment_status !== "paid" && o.status !== "cancelled" && (
                 <>
                   <button
                     type="button"
@@ -269,6 +359,26 @@ export default function UserOrdersPage() {
                   </button>
                 </>
               )}
+              {o.payment_status !== "paid" && o.status === "pending" && (
+                <button
+                  type="button"
+                  disabled={busyId === o.id}
+                  onClick={() => void cancelOrder(o)}
+                  className="min-h-9 rounded-lg border border-pp-border bg-white text-sm px-3 font-medium disabled:opacity-50"
+                >
+                  Cancel order
+                </button>
+              )}
+              {o.payment_status !== "paid" && (o.status === "pending" || o.status === "cancelled") && (
+                <button
+                  type="button"
+                  disabled={busyId === o.id}
+                  onClick={() => void deleteOrder(o)}
+                  className="min-h-9 rounded-lg border border-red-200 bg-white text-sm px-3 font-medium text-red-700 hover:bg-red-50 disabled:opacity-50"
+                >
+                  Delete
+                </button>
+              )}
             </div>
           </div>
           <div className="border-t border-pp-border pt-3">
@@ -276,6 +386,7 @@ export default function UserOrdersPage() {
               orderId={o.id}
               fileName={o.file_name}
               hasFile={!!o.file_path}
+              readOnly={o.payment_status === "paid" || o.status === "cancelled"}
               onDeleted={() =>
                 setOrders((prev) =>
                   prev.map((row) =>

@@ -1,26 +1,13 @@
 import { NextResponse } from "next/server";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { serviceClientOrError } from "@/lib/supabase/admin";
 import { requireAdmin } from "@/lib/require-admin";
 import type { UserRole } from "@/lib/types";
-
-function adminClientOrError() {
-  try {
-    return { admin: createAdminClient() };
-  } catch {
-    return {
-      error: NextResponse.json(
-        { error: "Server is missing SUPABASE_SERVICE_ROLE_KEY (required to manage auth users)." },
-        { status: 503 },
-      ),
-    };
-  }
-}
 
 export async function GET() {
   const auth = await requireAdmin();
   if ("error" in auth) return auth.error;
 
-  const privileged = adminClientOrError();
+  const privileged = serviceClientOrError("manage auth users");
   if ("error" in privileged) return privileged.error;
 
   const { data: profiles, error: profileError } = await auth.supabase
@@ -62,7 +49,7 @@ export async function POST(request: Request) {
   const auth = await requireAdmin();
   if ("error" in auth) return auth.error;
 
-  const privileged = adminClientOrError();
+  const privileged = serviceClientOrError("manage auth users");
   if ("error" in privileged) return privileged.error;
 
   const body = await request.json();

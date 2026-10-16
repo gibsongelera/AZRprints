@@ -1,13 +1,28 @@
 "use client";
 
+import { Search } from "lucide-react";
 import { useEffect, useState } from "react";
+import { ExportMenu } from "@/components/ExportMenu";
 import { OrderFileActions } from "@/components/OrderFileActions";
+import { useToast } from "@/components/ui/feedback";
+import type { ExportSpec } from "@/lib/export";
 import { formatPHP } from "@/lib/format";
+import { matchesSearch, printTypeLabel, type OrderWithProfile } from "@/lib/order-export";
 import { createClient } from "@/lib/supabase/client";
-import type { Order } from "@/lib/types";
+
+async function fetchOrders() {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("orders")
+    .select("*, profiles(name, student_id)")
+    .order("created_at", { ascending: false });
+  return { list: (data as OrderWithProfile[]) || [], error: error?.message || "" };
+}
 
 export default function AdminFilesPage() {
-  const [orders, setOrders] = useState<Order[]>([]);
+  const toast = useToast();
+  const [q, setQ] = useState("");
+  const [orders, setOrders] = useState<OrderWithProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [filter, setFilter] = useState<"all" | "with_file" | "missing">("all");
@@ -17,56 +32,95 @@ export default function AdminFilesPage() {
     url: string;
   } | null>(null);
 
-  async function load() {
-    const supabase = createClient();
-    const { data, error: err } = await supabase
-      .from("orders")
-      .select("*, profiles(name, student_id)")
-      .order("created_at", { ascending: false });
-    if (err) setError(err.message);
-    setOrders((data as Order[]) || []);
-    setLoading(false);
-  }
-
   useEffect(() => {
-    void load();
+    let active = true;
+    fetchOrders().then((res) => {
+      if (!active) return;
+      setOrders(res.list);
+      setError(res.error);
+      setLoading(false);
+    });
+    return () => {
+      active = false;
+    };
   }, []);
 
+  function load() {
+    fetchOrders().then((res) => {
+      setOrders(res.list);
+      setError(res.error);
+    });
+  }
+
   const filtered = orders.filter((o) => {
+    if (!matchesSearch(o, q)) return false;
     if (filter === "with_file") return !!o.file_path;
     if (filter === "missing") return !o.file_path;
     return true;
   });
 
   async function openPreview(orderId: string, fileName: string) {
+    const lower = fileName.toLowerCase();
+    const canEmbed = lower.endsWith(".pdf") || /\.(jpe?g|png|gif|webp)$/i.test(lower);
+    // Word files can't be embedded: open a tab right away so pop-up blockers allow it.
+    const win = canEmbed ? null : window.open("about:blank", "_blank");
     const res = await fetch(`/api/orders/${orderId}/file`);
     const json = await res.json();
     if (!res.ok) {
-      alert(json.error || "Could not open file");
+      win?.close();
+      toast.error("Couldn't open file", json.error);
       return;
     }
     const url = json.url as string;
-    const lower = fileName.toLowerCase();
-    const canEmbed =
-      lower.endsWith(".pdf") ||
-      /\.(jpe?g|png|gif|webp)$/i.test(lower);
     if (canEmbed) {
       setPreview({ orderId, fileName, url });
-    } else {
-      window.open(url, "_blank", "noopener,noreferrer");
+    } else if (win) {
+      win.opener = null;
+      win.location.href = url;
     }
   }
 
-  if (loading) return <p className="text-pp-muted">Loading…</p>;
+  const exportSpec = (): ExportSpec<OrderWithProfile> => ({
+    filename: "azr-order-files",
+    title: "Order files",
+    subtitle:
+      filter === "with_file" ? "Orders with a file" : filter === "missing" ? "Orders missing a file" : "All orders",
+    sheetName: "Files",
+    rows: filtered,
+    columns: [
+      { header: "Order", value: (o) => o.id, width: 20 },
+      { header: "Customer", value: (o) => o.profiles?.name || "", width: 22 },
+      { header: "Student ID", value: (o) => o.profiles?.student_id || "", width: 16 },
+      { header: "File", value: (o) => (o.file_path ? o.file_name : "(missing)"), width: 34 },
+      { header: "Type", value: (o) => printTypeLabel(o), width: 16 },
+      { header: "Pages", value: (o) => o.pages, type: "number", width: 8 },
+      { header: "Amount", value: (o) => o.amount, type: "currency", width: 12 },
+      { header: "Uploaded", value: (o) => o.created_at, type: "datetime", width: 18 },
+    ],
+  });
+
+  if (loading) return <p className="text-pp-muted">Loading files…</p>;
 
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-sm text-pp-muted">
-          Manage customer uploads — view, download, replace, or delete files.
-        </p>
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="relative">
+            <label htmlFor="f-search" className="sr-only">Search files</label>
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-pp-muted" aria-hidden />
+            <input
+              id="f-search"
+              type="search"
+              placeholder="Search order, student or file"
+              className="min-h-10 w-64 max-w-full rounded-lg border border-pp-border bg-white pl-9 pr-3 text-sm"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+            />
+          </div>
+        <label htmlFor="f-filter" className="sr-only">Filter files</label>
         <select
-          className="min-h-11 rounded-lg border border-pp-border px-3 text-sm"
+          id="f-filter"
+          className="min-h-10 rounded-lg border border-pp-border bg-white px-3 text-sm"
           value={filter}
           onChange={(e) =>
             setFilter(e.target.value as "all" | "with_file" | "missing")
@@ -76,6 +130,8 @@ export default function AdminFilesPage() {
           <option value="with_file">With file</option>
           <option value="missing">Missing file</option>
         </select>
+        </div>
+        <ExportMenu getSpec={exportSpec} disabled={!filtered.length} />
       </div>
 
       <div className="rounded-xl border border-pp-border bg-white overflow-hidden">
@@ -103,7 +159,7 @@ export default function AdminFilesPage() {
                     {o.id}
                   </td>
                   <td className="px-3 py-2">
-                    {(o.profiles as { name?: string } | null)?.name || "—"}
+                    {o.profiles?.name || "—"}
                   </td>
                   <td className="px-3 py-2 max-w-[200px]">
                     {o.file_path ? (

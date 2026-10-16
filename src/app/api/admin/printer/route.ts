@@ -1,47 +1,62 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { requireAdmin } from "@/lib/require-admin";
 
-async function requireAdmin() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
+const DEFAULTS = {
+  id: 1,
+  auto_print_enabled: true,
+  direct_print_enabled: true,
+  default_printer_name: "",
+  poll_interval_seconds: 15,
+  max_job_retries: 3,
+  spool_retention_hours: 24,
+};
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .maybeSingle();
-
-  if (profile?.role !== "admin") {
-    return { error: NextResponse.json({ error: "Forbidden" }, { status: 403 }) };
+function explain(message: string) {
+  if (/printer_settings|relation .* does not exist|schema cache/i.test(message)) {
+    return "Printer settings table is missing. Run supabase/migrations/002_print_queue.sql in the Supabase SQL editor, then reload this page.";
   }
-  return { supabase };
+  return message;
 }
 
 export async function GET() {
   const auth = await requireAdmin();
-  if ("error" in auth && auth.error) return auth.error;
+  if ("error" in auth) return auth.error;
 
-  const { data, error } = await auth.supabase!
+  const { data, error } = await auth.supabase
     .from("printer_settings")
     .select("*")
     .eq("id", 1)
-    .single();
+    .maybeSingle();
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: explain(error.message) }, { status: 500 });
   }
-  return NextResponse.json({ settings: data });
+  if (data) return NextResponse.json({ settings: data });
+
+  // Table exists but the singleton row was never seeded: create it with defaults.
+  const { data: created, error: insertError } = await auth.supabase
+    .from("printer_settings")
+    .upsert(DEFAULTS, { onConflict: "id" })
+    .select("*")
+    .maybeSingle();
+
+  if (insertError || !created) {
+    // RLS has no insert policy for this table; show defaults so the page still works.
+    return NextResponse.json({
+      settings: { ...DEFAULTS, updated_at: new Date().toISOString() },
+      notice:
+        "Using default printer settings. Run migration 002 again to save them to the database.",
+    });
+  }
+  return NextResponse.json({ settings: created });
 }
 
 export async function PUT(request: Request) {
   const auth = await requireAdmin();
-  if ("error" in auth && auth.error) return auth.error;
+  if ("error" in auth) return auth.error;
 
-  const body = await request.json();
-  const { data, error } = await auth.supabase!
+  const body = await request.json().catch(() => ({}));
+  const { data, error } = await auth.supabase
     .from("printer_settings")
     .update({
       auto_print_enabled: Boolean(body.auto_print_enabled),
@@ -53,7 +68,7 @@ export async function PUT(request: Request) {
       ),
       max_job_retries: Math.min(
         10,
-        Math.max(0, parseInt(String(body.max_job_retries || "3"), 10) || 3)
+        Math.max(0, parseInt(String(body.max_job_retries ?? "3"), 10) || 0)
       ),
       spool_retention_hours: Math.min(
         168,
@@ -63,10 +78,16 @@ export async function PUT(request: Request) {
     })
     .eq("id", 1)
     .select("*")
-    .single();
+    .maybeSingle();
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: explain(error.message) }, { status: 500 });
+  }
+  if (!data) {
+    return NextResponse.json(
+      { error: "Printer settings row is missing. Run migration 002, then save again." },
+      { status: 404 }
+    );
   }
   return NextResponse.json({ settings: data });
 }

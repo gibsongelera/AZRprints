@@ -21,6 +21,18 @@ export interface PayMongoLinkResult {
 const PREFERRED_PAYMENT_METHODS = ["qrph", "gcash", "paymaya", "card"];
 
 /**
+ * Business name shown to the payer instead of the PayMongo account owner's
+ * personal name. PayMongo falls back to the account's business name when this
+ * is omitted. Override with PAYMONGO_STATEMENT_DESCRIPTOR.
+ */
+export function statementDescriptor(): string {
+  return (process.env.PAYMONGO_STATEMENT_DESCRIPTOR || "AZR PRINTS")
+    .replace(/[^A-Za-z0-9 .\-]/g, "")
+    .trim()
+    .slice(0, 22);
+}
+
+/**
  * Create a PayMongo Checkout Session (preferred over Payment Links because it
  * lets us pin InstaPay/QRPh + GCash and carries order metadata end-to-end).
  * Amount in PHP; PayMongo expects centavos (integer).
@@ -37,39 +49,55 @@ export async function createCheckoutSession(opts: {
     throw new Error("Minimum PayMongo amount is ₱1.00");
   }
 
-  const res = await fetch(`${PAYMONGO_API}/checkout_sessions`, {
-    method: "POST",
-    headers: {
-      Authorization: authHeader(),
-      "Content-Type": "application/json",
-      Accept: "application/json",
-    },
-    body: JSON.stringify({
-      data: {
-        attributes: {
-          line_items: [
-            {
-              name: opts.description.slice(0, 255),
-              amount: amountCentavos,
-              currency: "PHP",
-              quantity: 1,
-            },
-          ],
-          payment_method_types: PREFERRED_PAYMENT_METHODS,
-          description: opts.description.slice(0, 255),
-          reference_number: opts.orderId,
-          metadata: { order_id: opts.orderId },
-          success_url: opts.successUrl,
-          cancel_url: opts.cancelUrl,
-          send_email_receipt: false,
-          show_description: true,
-          show_line_items: true,
-        },
+  const descriptor = statementDescriptor();
+  const send = (withDescriptor: boolean) =>
+    fetch(`${PAYMONGO_API}/checkout_sessions`, {
+      method: "POST",
+      headers: {
+        Authorization: authHeader(),
+        "Content-Type": "application/json",
+        Accept: "application/json",
       },
-    }),
-  });
+      body: JSON.stringify({
+        data: {
+          attributes: {
+            line_items: [
+              {
+                name: opts.description.slice(0, 255),
+                amount: amountCentavos,
+                currency: "PHP",
+                quantity: 1,
+              },
+            ],
+            payment_method_types: PREFERRED_PAYMENT_METHODS,
+            description: opts.description.slice(0, 255),
+            reference_number: opts.orderId,
+            metadata: { order_id: opts.orderId },
+            success_url: opts.successUrl,
+            cancel_url: opts.cancelUrl,
+            send_email_receipt: false,
+            show_description: true,
+            show_line_items: true,
+            ...(withDescriptor && descriptor
+              ? { statement_descriptor: descriptor }
+              : {}),
+          },
+        },
+      }),
+    });
 
-  const json = await res.json();
+  let res = await send(true);
+  let json = await res.json();
+  // If PayMongo rejects the descriptor (format/length rules), retry without it
+  // so checkout never breaks because of branding.
+  if (
+    !res.ok &&
+    descriptor &&
+    JSON.stringify(json?.errors || "").includes("statement_descriptor")
+  ) {
+    res = await send(false);
+    json = await res.json();
+  }
   if (!res.ok) {
     const msg =
       json?.errors?.[0]?.detail ||
@@ -211,6 +239,29 @@ export async function isPaymongoResourcePaid(
   }
 
   return false;
+}
+
+/**
+ * Close an unpaid checkout so it can't be paid after its order is cancelled or
+ * deleted (Checkout Sessions are expired, Payment Links archived).
+ * Best effort: returns false instead of throwing.
+ */
+export async function closePaymongoResource(resourceId: string): Promise<boolean> {
+  const id = (resourceId || "").trim();
+  if (!id) return false;
+  const path = id.startsWith("link_")
+    ? `/links/${id}/archive`
+    : `/checkout_sessions/${id}/expire`;
+  try {
+    const res = await fetch(`${PAYMONGO_API}${path}`, {
+      method: "POST",
+      headers: { Authorization: authHeader(), Accept: "application/json" },
+      cache: "no-store",
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
 }
 
 /**

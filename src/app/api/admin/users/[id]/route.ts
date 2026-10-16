@@ -1,20 +1,7 @@
 import { NextResponse } from "next/server";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { serviceClientOrError } from "@/lib/supabase/admin";
 import { requireAdmin } from "@/lib/require-admin";
 import type { UserRole } from "@/lib/types";
-
-function adminClientOrError() {
-  try {
-    return { admin: createAdminClient() };
-  } catch {
-    return {
-      error: NextResponse.json(
-        { error: "Server is missing SUPABASE_SERVICE_ROLE_KEY (required to manage auth users)." },
-        { status: 503 },
-      ),
-    };
-  }
-}
 
 export async function PATCH(
   request: Request,
@@ -23,7 +10,7 @@ export async function PATCH(
   const auth = await requireAdmin();
   if ("error" in auth) return auth.error;
 
-  const privileged = adminClientOrError();
+  const privileged = serviceClientOrError("manage auth users");
   if ("error" in privileged) return privileged.error;
 
   const { id } = await context.params;
@@ -142,7 +129,7 @@ export async function DELETE(
     return NextResponse.json({ error: "You cannot delete your own account." }, { status: 400 });
   }
 
-  const privileged = adminClientOrError();
+  const privileged = serviceClientOrError("manage auth users");
   if ("error" in privileged) return privileged.error;
 
   const { error } = await privileged.admin.auth.admin.deleteUser(id);

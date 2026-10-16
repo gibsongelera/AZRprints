@@ -18,6 +18,7 @@
   --color-pp-primary: var(--pp-primary);
   --color-pp-primary-dark: var(--pp-primary-dark);
   --color-pp-accent: var(--pp-accent);
+  --color-pp-accent-hover: var(--pp-accent-hover);
   --color-pp-bg: var(--pp-bg);
   --color-pp-border: var(--pp-border);
   --color-pp-muted: var(--pp-muted);
@@ -33,4 +34,38 @@ body {
 
 h1, h2, h3, h4, .brand-title {
   font-family: var(--font-display), var(--font-sans), system-ui, sans-serif;
+}
+
+/* Visible keyboard focus everywhere */
+:where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--pp-accent);
+  outline-offset: 2px;
+}
+
+/* One small entrance for things that appear in response to an action
+   (dialogs, menus, toasts). */
+@keyframes pp-pop {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.pp-pop {
+  animation: pp-pop 0.16s ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pp-pop {
+    animation: none;
+  }
+}
+
+/* Tabular figures for columns of numbers */
+.tnum {
+  font-variant-numeric: tabular-nums;
 }

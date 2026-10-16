@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { verifyTicketAttachment, type AttachmentColumns } from "@/lib/ticket-files";
 
+/**
+ * Post a reply to a ticket (student owner or admin).
+ * Body: { body?: string, attachment?: { path, name, size } } — at least one is required.
+ */
 export async function POST(
   request: Request,
   context: { params: Promise<{ id: string }> }
@@ -14,10 +19,13 @@ export async function POST(
   }
 
   const { id: ticketId } = await context.params;
-  const body = await request.json();
-  const text = String(body.body || "").trim();
-  if (!text) {
-    return NextResponse.json({ error: "Message required" }, { status: 400 });
+  const payload = await request.json().catch(() => ({}));
+  const text = String(payload.body || "").trim();
+  if (!text && !payload.attachment) {
+    return NextResponse.json(
+      { error: "Write a message or attach a file" },
+      { status: 400 }
+    );
   }
 
   const { data: profile } = await supabase
@@ -42,6 +50,20 @@ export async function POST(
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
+  let attachment: Partial<AttachmentColumns> = {};
+  if (payload.attachment) {
+    const verified = await verifyTicketAttachment(
+      supabase,
+      ticket.user_id,
+      ticketId,
+      payload.attachment
+    );
+    if (verified.error || !verified.data) {
+      return NextResponse.json({ error: verified.error }, { status: 400 });
+    }
+    attachment = verified.data;
+  }
+
   const senderRole = isAdmin ? "admin" : "user";
 
   const { data: message, error: msgError } = await supabase
@@ -51,6 +73,7 @@ export async function POST(
       sender_id: user.id,
       sender_role: senderRole,
       body: text,
+      ...attachment,
     })
     .select("*")
     .single();

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createCheckoutSession, createPaymentLink } from "@/lib/paymongo";
+import { serviceClientOrError } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
@@ -46,6 +47,17 @@ export async function POST(request: Request) {
     if (order.payment_status === "paid") {
       return NextResponse.json({ error: "Order already paid" }, { status: 400 });
     }
+    if (order.status === "cancelled") {
+      return NextResponse.json(
+        { error: "This order was cancelled. Place a new order to print this file." },
+        { status: 400 }
+      );
+    }
+
+    // Payment fields are locked for students (migration 004), so the server
+    // writes them with the service role after the ownership check above.
+    const privileged = serviceClientOrError("start PayMongo checkout");
+    if ("error" in privileged) return privileged.error;
 
     if (order.paymongo_checkout_url && order.paymongo_link_id) {
       return NextResponse.json({
@@ -86,7 +98,7 @@ export async function POST(request: Request) {
       }
     }
 
-    const { error: updateError } = await supabase
+    const { error: updateError } = await privileged.admin
       .from("orders")
       .update({
         paymongo_link_id: link.id,

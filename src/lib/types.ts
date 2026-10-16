@@ -13,6 +13,7 @@ export interface Profile {
   college: string | null;
   department: string | null;
   phone: string | null;
+  avatar_url?: string | null;
   email?: string;
   created_at: string;
 }
@@ -90,12 +91,17 @@ export interface PrinterSettings {
   updated_at: string;
 }
 
+/** 'all' = everyone, 'users' = students only, 'admin' = admins only (broadcasts) */
+export type NotificationAudience = "all" | "users" | "admin";
+
 export interface Notification {
   id: number;
   user_id: string | null;
   type: string;
   title: string;
   message: string;
+  audience?: NotificationAudience;
+  link?: string | null;
   created_at: string;
 }
 
@@ -124,5 +130,10 @@ export interface TicketMessage {
   sender_id: string;
   sender_role: "user" | "admin";
   body: string;
+  attachment_path?: string | null;
+  attachment_name?: string | null;
+  attachment_type?: string | null;
+  attachment_size?: number | null;
+  edited_at?: string | null;
   created_at: string;
 }

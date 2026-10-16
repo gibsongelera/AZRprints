@@ -24,5 +24,5 @@ export default async function UserTicketThreadPage({
     redirect("/user/tickets");
   }
 
-  return <TicketThread ticketId={id} viewerRole="user" />;
+  return <TicketThread key={id} ticketId={id} viewerRole="user" />;
 }
