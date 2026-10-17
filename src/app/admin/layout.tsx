@@ -15,14 +15,20 @@ export default async function AdminLayout({
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("name, role")
+    .select("*")
     .eq("id", user.id)
     .maybeSingle();
 
   if (profile?.role !== "admin") redirect("/user/dashboard");
 
   return (
-    <AppShell role="admin" name={profile?.name || user.email || "Admin"}>
+    <AppShell
+      role="admin"
+      userId={user.id}
+      name={profile?.name || user.email || "Admin"}
+      email={user.email || ""}
+      avatarUrl={(profile?.avatar_url as string | null) ?? null}
+    >
       {children}
     </AppShell>
   );

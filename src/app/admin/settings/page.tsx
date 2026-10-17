@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
+import { useToast } from "@/components/ui/feedback";
 import { createClient } from "@/lib/supabase/client";
 
 export default function AdminSettingsPage() {
@@ -8,8 +9,7 @@ export default function AdminSettingsPage() {
   const [tagline, setTagline] = useState("");
   const [openTime, setOpenTime] = useState("07:00");
   const [closeTime, setCloseTime] = useState("18:00");
-  const [msg, setMsg] = useState("");
-  const [error, setError] = useState("");
+  const toast = useToast();
 
   useEffect(() => {
     const supabase = createClient();
@@ -29,8 +29,6 @@ export default function AdminSettingsPage() {
 
   async function onSave(e: FormEvent) {
     e.preventDefault();
-    setMsg("");
-    setError("");
     const res = await fetch("/api/admin/settings", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
@@ -42,8 +40,8 @@ export default function AdminSettingsPage() {
       }),
     });
     const json = await res.json();
-    if (!res.ok) setError(json.error || "Save failed");
-    else setMsg("Settings saved.");
+    if (!res.ok) toast.error("Couldn't save", json.error || "Try again.");
+    else toast.success("Settings saved");
   }
 
   return (
@@ -87,8 +85,6 @@ export default function AdminSettingsPage() {
           />
         </div>
       </div>
-      {error && <p className="text-sm text-red-600">{error}</p>}
-      {msg && <p className="text-sm text-green-700">{msg}</p>}
       <button
         type="submit"
         className="min-h-11 rounded-lg bg-pp-accent text-white font-semibold px-4"

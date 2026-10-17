@@ -1,74 +1,102 @@
 "use client";
 
+import { Paperclip } from "lucide-react";
 import Link from "next/link";
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { PendingFile } from "@/components/TicketAttachment";
+import { CATEGORY_LABELS, STATUS_LABELS, ticketBadge } from "@/components/TicketThread";
+import { useToast } from "@/components/ui/feedback";
 import { createClient } from "@/lib/supabase/client";
+import {
+  newUuid,
+  TICKET_FILE_ACCEPT,
+  uploadTicketAttachment,
+  validateTicketFile,
+} from "@/lib/ticket-files";
 import type { Ticket, TicketCategory } from "@/lib/types";
 
-function badge(status: string) {
-  const map: Record<string, string> = {
-    open: "bg-amber-100 text-amber-800",
-    in_progress: "bg-blue-100 text-blue-800",
-    resolved: "bg-green-100 text-green-800",
-    closed: "bg-slate-100 text-slate-700",
-  };
-  return map[status] || "bg-slate-100 text-slate-700";
+async function fetchMyTickets() {
+  const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return [];
+  const { data } = await supabase
+    .from("tickets")
+    .select("*")
+    .eq("user_id", user.id)
+    .order("updated_at", { ascending: false });
+  return (data as Ticket[]) || [];
 }
-
-const CATEGORY_LABELS: Record<TicketCategory, string> = {
-  order_issue: "Order issue",
-  payment: "Payment",
-  printer: "Printer",
-  report: "Report",
-  general: "General",
-};
 
 export default function UserTicketsPage() {
   const router = useRouter();
+  const toast = useToast();
+  const fileRef = useRef<HTMLInputElement>(null);
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [loading, setLoading] = useState(true);
   const [subject, setSubject] = useState("");
   const [category, setCategory] = useState<TicketCategory>("general");
   const [message, setMessage] = useState("");
-  const [error, setError] = useState("");
+  const [file, setFile] = useState<File | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  async function load() {
-    const supabase = createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) return;
-    const { data } = await supabase
-      .from("tickets")
-      .select("*")
-      .eq("user_id", user.id)
-      .order("updated_at", { ascending: false });
-    setTickets((data as Ticket[]) || []);
-    setLoading(false);
-  }
-
   useEffect(() => {
-    void load();
+    let active = true;
+    fetchMyTickets().then((list) => {
+      if (!active) return;
+      setTickets(list);
+      setLoading(false);
+    });
+    return () => {
+      active = false;
+    };
   }, []);
+
+  function pickFile(f: File | null) {
+    if (fileRef.current) fileRef.current.value = "";
+    if (!f) return;
+    const invalid = validateTicketFile(f.name, f.size);
+    if (invalid) {
+      toast.error("Can't attach this file", invalid);
+      return;
+    }
+    setFile(f);
+  }
 
   async function onCreate(e: FormEvent) {
     e.preventDefault();
-    setError("");
-    setSubmitting(true);
-    const res = await fetch("/api/tickets", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ subject, category, message }),
-    });
-    const json = await res.json();
-    if (!res.ok) {
-      setError(json.error || "Failed to create ticket");
-      setSubmitting(false);
+    if (!message.trim() && !file) {
+      toast.warning("Add some details", "Describe your issue or attach a file.");
       return;
     }
-    router.push(`/user/tickets/${json.ticket.id}`);
+    setSubmitting(true);
+    try {
+      const supabase = createClient();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) throw new Error("Your session expired. Sign in again.");
+
+      const id = newUuid();
+      const attachment = file
+        ? await uploadTicketAttachment(supabase, user.id, id, file)
+        : undefined;
+
+      const res = await fetch("/api/tickets", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, subject, category, message, attachment }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Failed to create ticket");
+      toast.success("Ticket submitted", "Our staff will reply here. You'll get a notification.");
+      router.push(`/user/tickets/${json.ticket.id}`);
+    } catch (err) {
+      toast.error("Ticket not submitted", err instanceof Error ? err.message : undefined);
+      setSubmitting(false);
+    }
   }
 
   return (
@@ -78,38 +106,76 @@ export default function UserTicketsPage() {
         className="rounded-xl border border-pp-border bg-white p-5 space-y-3"
       >
         <h2 className="font-semibold">New ticket</h2>
-        <select
-          className="w-full min-h-11 rounded-lg border border-pp-border px-3"
-          value={category}
-          onChange={(e) => setCategory(e.target.value as TicketCategory)}
-        >
-          <option value="general">General</option>
-          <option value="order_issue">Order issue</option>
-          <option value="payment">Payment</option>
-          <option value="printer">Printer</option>
-          <option value="report">Report</option>
-        </select>
-        <input
-          required
-          placeholder="Subject"
-          className="w-full min-h-11 rounded-lg border border-pp-border px-3"
-          value={subject}
-          onChange={(e) => setSubject(e.target.value)}
-        />
-        <textarea
-          required
-          placeholder="Describe your issue…"
-          className="w-full min-h-24 rounded-lg border border-pp-border px-3 py-2"
-          value={message}
-          onChange={(e) => setMessage(e.target.value)}
-        />
-        {error && <p className="text-sm text-red-600">{error}</p>}
+        <div>
+          <label htmlFor="tk-cat" className="block text-sm mb-1">Topic</label>
+          <select
+            id="tk-cat"
+            className="w-full min-h-11 rounded-lg border border-pp-border px-3"
+            value={category}
+            onChange={(e) => setCategory(e.target.value as TicketCategory)}
+          >
+            <option value="general">General</option>
+            <option value="order_issue">Order issue</option>
+            <option value="payment">Payment</option>
+            <option value="printer">Printer</option>
+            <option value="report">Report</option>
+          </select>
+        </div>
+        <div>
+          <label htmlFor="tk-subject" className="block text-sm mb-1">Subject</label>
+          <input
+            id="tk-subject"
+            required
+            maxLength={200}
+            placeholder="e.g. My printout came out cropped"
+            className="w-full min-h-11 rounded-lg border border-pp-border px-3"
+            value={subject}
+            onChange={(e) => setSubject(e.target.value)}
+          />
+        </div>
+        <div>
+          <label htmlFor="tk-msg" className="block text-sm mb-1">Details</label>
+          <textarea
+            id="tk-msg"
+            placeholder="Describe your issue…"
+            className="w-full min-h-24 rounded-lg border border-pp-border px-3 py-2"
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+          />
+        </div>
+
+        <div className="space-y-2">
+          <input
+            ref={fileRef}
+            type="file"
+            accept={TICKET_FILE_ACCEPT}
+            className="hidden"
+            onChange={(e) => pickFile(e.target.files?.[0] || null)}
+          />
+          {file ? (
+            <PendingFile file={file} onRemove={() => setFile(null)} />
+          ) : (
+            <button
+              type="button"
+              onClick={() => fileRef.current?.click()}
+              className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-dashed border-pp-border px-3 text-sm font-medium text-pp-muted hover:border-pp-accent hover:text-pp-accent"
+            >
+              <Paperclip className="h-4 w-4" aria-hidden />
+              Attach a file
+            </button>
+          )}
+          <p className="text-xs text-pp-muted">
+            Optional: a screenshot, receipt or document (PDF, Word, Excel, image) up to 10 MB.
+            Staff can download it from the ticket.
+          </p>
+        </div>
+
         <button
           type="submit"
           disabled={submitting}
           className="min-h-11 rounded-lg bg-pp-accent text-white font-semibold px-4 disabled:opacity-50"
         >
-          {submitting ? "Creating…" : "Submit ticket"}
+          {submitting ? (file ? "Uploading…" : "Submitting…") : "Submit ticket"}
         </button>
       </form>
 
@@ -138,14 +204,10 @@ export default function UserTicketsPage() {
                   </div>
                 </div>
                 <div className="flex flex-col items-end gap-2 shrink-0">
-                  <span
-                    className={`text-xs font-medium px-2 py-1 rounded-full ${badge(t.status)}`}
-                  >
-                    {t.status}
+                  <span className={`text-xs font-medium px-2 py-1 rounded-full ${ticketBadge(t.status)}`}>
+                    {STATUS_LABELS[t.status] || t.status}
                   </span>
-                  <span className="text-xs font-medium text-pp-accent">
-                    Open chat →
-                  </span>
+                  <span className="text-xs font-medium text-pp-accent">Open chat</span>
                 </div>
               </div>
             </Link>

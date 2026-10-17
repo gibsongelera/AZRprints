@@ -1,10 +1,11 @@
-import { TicketThread } from "@/components/TicketThread";
+import { redirect } from "next/navigation";
 
+/** Deep links open the ticket inside the inbox view. */
 export default async function AdminTicketThreadPage({
   params,
 }: {
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  return <TicketThread ticketId={id} viewerRole="admin" />;
+  redirect(`/admin/tickets?id=${encodeURIComponent(id)}`);
 }

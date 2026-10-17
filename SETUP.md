@@ -69,8 +69,10 @@ Open [http://localhost:3000](http://localhost:3000).
 1. Open that Supabase project → **SQL Editor**.
 2. Paste and run the full script in [`supabase/migrations/001_initial.sql`](supabase/migrations/001_initial.sql).
 3. Run [`supabase/migrations/002_print_queue.sql`](supabase/migrations/002_print_queue.sql) for print queue and mixed-content order fields.
-4. Confirm tables exist: `profiles`, `pricing`, `shop_settings`, `orders`, `notifications`, `print_jobs`, `printer_settings`.
-4. Confirm Storage bucket `order-files` exists (private).
+4. Run [`supabase/migrations/003_tickets.sql`](supabase/migrations/003_tickets.sql) for support tickets and live chat.
+5. Run [`supabase/migrations/004_notifications_avatars_attachments.sql`](supabase/migrations/004_notifications_avatars_attachments.sql) for the notification bell, profile pictures, ticket file attachments, and the CRUD permissions and data guards (section 5: students can't change prices or mark orders paid; delete/edit rules for orders, tickets, messages, announcements and print jobs). It is safe to run again; re-run it after pulling an update.
+6. Confirm tables exist: `profiles`, `pricing`, `shop_settings`, `orders`, `notifications`, `notification_reads`, `print_jobs`, `printer_settings`, `tickets`, `ticket_messages`.
+7. Confirm Storage buckets exist: `order-files` (private), `ticket-files` (private), `avatars` (public).
 
 ### Auth URL configuration (local)
 
@@ -106,6 +108,12 @@ where id = (
    - Events: `checkout_session.payment.paid`, `link.payment.paid`, `payment.paid`, `payment.failed`
 4. Copy the webhook signing secret into `PAYMONGO_WEBHOOK_SECRET`.
 5. Redeploy / restart so the secret is loaded.
+6. **Payer-facing name.** The app sends `statement_descriptor = PAYMONGO_STATEMENT_DESCRIPTOR`
+   (default `AZR PRINTS`) on every checkout. The merchant name at the top of PayMongo's hosted
+   checkout page comes from the PayMongo **account's business profile**, not from the API. If it
+   still shows a personal name, update the business/trade name in the PayMongo Dashboard
+   (Settings → Business information) or ask PayMongo support to change the display name, or use
+   a PayMongo account registered to the shop.
 
 Checkout flow:
 
@@ -141,11 +149,12 @@ In Vercel → Project → **Settings** → **Environment Variables**, add for **
 |------|--------|
 | `NEXT_PUBLIC_SUPABASE_URL` | your Supabase URL |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | anon / publishable key |
-| `SUPABASE_SERVICE_ROLE_KEY` | service_role key |
+| `SUPABASE_SERVICE_ROLE_KEY` | service_role key (required: checkout, payment confirmation, user management) |
 | `PAYMONGO_SECRET_KEY` | `sk_test_...` (or live later) |
 | `NEXT_PUBLIC_PAYMONGO_PUBLIC_KEY` | `pk_test_...` |
 | `PAYMONGO_WEBHOOK_SECRET` | from PayMongo webhook (can add after first deploy) |
 | `NEXT_PUBLIC_APP_URL` | `https://your-app.vercel.app` (update after first deploy) |
+| `PAYMONGO_STATEMENT_DESCRIPTOR` | optional, default `AZR PRINTS` (name shown to payers) |
 
 ### D. Deploy
 
@@ -209,6 +218,11 @@ Upload size is capped at **10 MB** per file in the API and Storage bucket.
 - Rotate PayMongo test keys if they were shared in chat or screenshots.
 - This Supabase project may contain other tables from previous work. Ensure RLS is enabled on any sensitive tables you still use.
 - Profile RLS prevents users from changing their own `role` to `admin`.
+- Order guard (migration 004, `guard_order_write`): a student's insert is re-priced on the server and
+  forced to unpaid; a student can only replace the file of an unpaid order or cancel it. Payment
+  fields are written by the server with the service role after PayMongo confirms the payment.
+- Cancelling or deleting an unpaid order first asks PayMongo whether it was paid, then expires the
+  checkout so an old payment link can't be paid later.
 
 ## 8. Useful scripts
 

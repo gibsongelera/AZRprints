@@ -1,6 +1,11 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useState } from "react";
+import { Search, UserPlus } from "lucide-react";
+import { FormEvent, useEffect, useState } from "react";
+import { ExportMenu } from "@/components/ExportMenu";
+import { RowAction, RowActions } from "@/components/ui/RowActions";
+import { useConfirm, useToast } from "@/components/ui/feedback";
+import type { ExportSpec } from "@/lib/export";
 import type { Profile, UserRole } from "@/lib/types";
 
 type AdminUser = Pick<
@@ -19,7 +24,18 @@ const emptyForm = {
   phone: "",
 };
 
+async function fetchUsers(): Promise<{ users: AdminUser[]; error: string }> {
+  const res = await fetch("/api/admin/users");
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) return { users: [], error: json.error || "Failed to load users" };
+  return { users: json.users || [], error: "" };
+}
+
 export default function AdminUsersPage() {
+  const toast = useToast();
+  const confirm = useConfirm();
+  const [q, setQ] = useState("");
+  const [roleFilter, setRoleFilter] = useState<UserRole | "all">("all");
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -29,22 +45,18 @@ export default function AdminUsersPage() {
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState("");
 
-  const load = useCallback(async () => {
-    setError("");
-    const res = await fetch("/api/admin/users");
-    const json = await res.json();
-    if (!res.ok) {
-      setError(json.error || "Failed to load users");
-      setUsers([]);
-    } else {
-      setUsers(json.users || []);
-    }
-    setLoading(false);
-  }, []);
-
   useEffect(() => {
-    void load();
-  }, [load]);
+    let active = true;
+    fetchUsers().then((res) => {
+      if (!active) return;
+      setUsers(res.users);
+      setError(res.error);
+      setLoading(false);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   function openCreate() {
     setForm(emptyForm);
@@ -115,7 +127,9 @@ export default function AdminUsersPage() {
 
     if (modal === "create") {
       setUsers((prev) => [json.user as AdminUser, ...prev]);
+      toast.success("User created", `${payload.name || payload.email} can now sign in.`);
     } else {
+      toast.success("Changes saved", payload.name || payload.email);
       setUsers((prev) =>
         prev.map((u) => (u.id === editingId ? (json.user as AdminUser) : u)),
       );
@@ -125,34 +139,95 @@ export default function AdminUsersPage() {
 
   async function onDelete(u: AdminUser) {
     const label = u.name || u.email || u.id;
-    if (!confirm(`Delete user "${label}"? Their orders and files will be removed.`)) return;
+    const ok = await confirm({
+      title: `Delete ${label}?`,
+      message: "Their account, orders and uploaded files will be removed. This can't be undone.",
+      confirmLabel: "Delete user",
+      tone: "danger",
+    });
+    if (!ok) return;
 
     const res = await fetch(`/api/admin/users/${u.id}`, { method: "DELETE" });
     const json = await res.json();
     if (!res.ok) {
-      alert(json.error || "Delete failed");
+      toast.error("Couldn't delete user", json.error);
       return;
     }
     setUsers((prev) => prev.filter((row) => row.id !== u.id));
+    toast.success("User deleted", label);
   }
 
-  if (loading) return <p className="text-pp-muted">Loading…</p>;
+  const visible = users.filter((u) => {
+    if (roleFilter !== "all" && u.role !== roleFilter) return false;
+    if (!q.trim()) return true;
+    const hay = `${u.name} ${u.email} ${u.student_id} ${u.college} ${u.department}`.toLowerCase();
+    return hay.includes(q.toLowerCase().trim());
+  });
+
+  const exportSpec = (): ExportSpec<AdminUser> => ({
+    filename: "azr-users",
+    title: "Users",
+    subtitle: roleFilter === "all" ? "All accounts" : roleFilter === "admin" ? "Admins" : "Students",
+    sheetName: "Users",
+    rows: visible,
+    columns: [
+      { header: "Name", value: (u) => u.name, width: 24 },
+      { header: "Email", value: (u) => u.email, width: 30 },
+      { header: "Role", value: (u) => (u.role === "admin" ? "Admin" : "Student"), width: 10 },
+      { header: "ZPPSU ID", value: (u) => u.student_id, width: 18 },
+      { header: "College", value: (u) => u.college, width: 14 },
+      { header: "Department", value: (u) => u.department, width: 16 },
+      { header: "Phone", value: (u) => u.phone, width: 16 },
+      { header: "Joined", value: (u) => u.created_at, type: "date", width: 12 },
+    ],
+    summary: [
+      { label: "Accounts", value: String(visible.length) },
+      { label: "Students", value: String(visible.filter((u) => u.role === "user").length) },
+      { label: "Admins", value: String(visible.filter((u) => u.role === "admin").length) },
+    ],
+  });
+
+  if (loading) return <p className="text-pp-muted">Loading users…</p>;
 
   return (
     <>
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <p className="text-sm text-pp-muted">
-          Create accounts, change roles, and remove users. Requires{" "}
-          <code className="text-xs bg-slate-100 px-1 rounded">SUPABASE_SERVICE_ROLE_KEY</code>{" "}
-          on the server.
-        </p>
-        <button
-          type="button"
-          onClick={openCreate}
-          className="min-h-10 rounded-lg bg-pp-accent text-white font-semibold px-4 text-sm"
-        >
-          Add user
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="relative">
+            <label htmlFor="u-search" className="sr-only">Search users</label>
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-pp-muted" aria-hidden />
+            <input
+              id="u-search"
+              type="search"
+              placeholder="Search name, email or ID"
+              className="min-h-10 w-64 max-w-full rounded-lg border border-pp-border bg-white pl-9 pr-3 text-sm"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+            />
+          </div>
+          <label htmlFor="u-role" className="sr-only">Role</label>
+          <select
+            id="u-role"
+            className="min-h-10 rounded-lg border border-pp-border bg-white px-3 text-sm"
+            value={roleFilter}
+            onChange={(e) => setRoleFilter(e.target.value as UserRole | "all")}
+          >
+            <option value="all">All roles ({users.length})</option>
+            <option value="user">Students ({users.filter((u) => u.role === "user").length})</option>
+            <option value="admin">Admins ({users.filter((u) => u.role === "admin").length})</option>
+          </select>
+        </div>
+        <div className="flex items-center gap-2">
+          <ExportMenu getSpec={exportSpec} disabled={!visible.length} />
+          <button
+            type="button"
+            onClick={openCreate}
+            className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-pp-accent text-white font-semibold px-4 text-sm"
+          >
+            <UserPlus className="h-4 w-4" aria-hidden />
+            Add user
+          </button>
+        </div>
       </div>
 
       <div className="rounded-xl border border-pp-border bg-white overflow-hidden">
@@ -171,44 +246,42 @@ export default function AdminUsersPage() {
                 <th className="px-3 py-2">ZPPSU ID</th>
                 <th className="px-3 py-2">College / Dept</th>
                 <th className="px-3 py-2">Phone</th>
-                <th className="px-3 py-2 w-32">Actions</th>
+                <th className="px-3 py-2 text-right">Actions</th>
               </tr>
             </thead>
             <tbody>
-              {users.map((u) => (
+              {visible.map((u) => (
                 <tr key={u.id} className="border-t border-pp-border">
                   <td className="px-3 py-2 font-medium">{u.name || "—"}</td>
                   <td className="px-3 py-2">{u.email || "—"}</td>
                   <td className="px-3 py-2 capitalize">{u.role}</td>
                   <td className="px-3 py-2">{u.student_id || "—"}</td>
                   <td className="px-3 py-2">
-                    {[u.college, u.department].filter(Boolean).join(" · ") || "—"}
+                    {[u.college, u.department].filter(Boolean).join(", ") || "—"}
                   </td>
                   <td className="px-3 py-2">{u.phone || "—"}</td>
                   <td className="px-3 py-2">
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
+                    <RowActions>
+                      <RowAction
+                        kind="edit"
+                        label="Edit user"
+                        ariaLabel={`Edit ${u.name || u.email || "user"}`}
                         onClick={() => openEdit(u)}
-                        className="text-pp-accent font-medium hover:underline"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        type="button"
+                      />
+                      <RowAction
+                        kind="delete"
+                        label="Delete user"
+                        ariaLabel={`Delete ${u.name || u.email || "user"}`}
                         onClick={() => void onDelete(u)}
-                        className="text-red-600 font-medium hover:underline"
-                      >
-                        Delete
-                      </button>
-                    </div>
+                      />
+                    </RowActions>
                   </td>
                 </tr>
               ))}
-              {!users.length && !error && (
+              {!visible.length && !error && (
                 <tr>
                   <td colSpan={7} className="px-3 py-8 text-center text-pp-muted">
-                    No users yet
+                    {users.length ? "No users match your search." : "No users yet."}
                   </td>
                 </tr>
               )}
@@ -270,7 +343,7 @@ export default function AdminUsersPage() {
                     setForm((f) => ({ ...f, role: e.target.value as UserRole }))
                   }
                 >
-                  <option value="user">User</option>
+                  <option value="user">Student</option>
                   <option value="admin">Admin</option>
                 </select>
               </div>

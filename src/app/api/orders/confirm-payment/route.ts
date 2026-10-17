@@ -91,7 +91,10 @@ export async function POST(request: Request) {
       );
     }
 
-    const { data: updated, error: updateError } = await supabase
+    // Students can't write payment fields (migration 004); PayMongo just
+    // confirmed the payment, so the server records it with the service role.
+    const admin = createAdminClient();
+    const { data: updated, error: updateError } = await admin
       .from("orders")
       .update({
         payment_status: "paid",
@@ -106,16 +109,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: updateError.message }, { status: 500 });
     }
 
-    const admin = createAdminClient();
     await enqueuePrintJobForOrder(admin, order.id);
 
-    // Best-effort notification (ignore failure)
-    await supabase.from("notifications").insert({
-      user_id: user.id,
-      type: "success",
-      title: "Payment received",
-      message: `Your payment for ${order.id} was confirmed. Your print job is now in progress.`,
-    });
+    // The "Payment received" notifications for the student and the admins are
+    // created by the database trigger in migration 004 (notify_order_events).
 
     return NextResponse.json({
       ok: true,

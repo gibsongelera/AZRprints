@@ -1,7 +1,12 @@
 "use client";
 
+import { CreditCard, RefreshCw } from "lucide-react";
 import { useEffect, useState } from "react";
+import { ExportMenu } from "@/components/ExportMenu";
 import { OrderFileActions } from "@/components/OrderFileActions";
+import { useConfirm, useToast } from "@/components/ui/feedback";
+import { RowAction, RowActions } from "@/components/ui/RowActions";
+import type { ExportSpec } from "@/lib/export";
 import { formatPHP } from "@/lib/format";
 import { createClient } from "@/lib/supabase/client";
 import type { Order } from "@/lib/types";
@@ -19,6 +24,9 @@ function badge(status: string) {
 }
 
 export default function UserOrdersPage() {
+  const toast = useToast();
+  const confirm = useConfirm();
+  const [busyId, setBusyId] = useState<string | null>(null);
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [confirming, setConfirming] = useState(false);
@@ -139,18 +147,72 @@ export default function UserOrdersPage() {
       body: JSON.stringify({ orderId }),
     });
     const text = await res.text();
-    let json: { error?: string; checkoutUrl?: string } = {};
+    let json: { error?: string; checkoutUrl?: string; paid?: boolean } = {};
     try {
       json = text ? JSON.parse(text) : {};
     } catch {
-      alert(`Checkout failed (${res.status}). Restart npm run dev and try again.`);
+      toast.error("Checkout failed", `The server answered ${res.status}. Try again in a moment.`);
+      return;
+    }
+    if (json.paid) {
+      toast.success("Already paid", json.error);
+      await loadOrders();
       return;
     }
     if (res.ok && json.checkoutUrl) {
+      toast.info("Opening secure checkout…");
       window.location.assign(json.checkoutUrl);
     } else {
-      alert(json.error || "Could not start checkout");
+      toast.error("Couldn't start checkout", json.error);
     }
+  }
+
+  async function cancelOrder(o: Order) {
+    const ok = await confirm({
+      title: `Cancel order ${o.id}?`,
+      message:
+        "The shop won't print it and its payment link will stop working. You can delete the order afterwards.",
+      confirmLabel: "Yes, cancel order",
+      cancelLabel: "No, keep it",
+      tone: "danger",
+    });
+    if (!ok) return;
+    setBusyId(o.id);
+    const res = await fetch(`/api/orders/${o.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: "cancelled" }),
+    });
+    const json = await res.json().catch(() => ({}));
+    setBusyId(null);
+    if (!res.ok) {
+      toast.error("Couldn't cancel the order", json.error);
+      await loadOrders();
+      return;
+    }
+    setOrders((prev) => prev.map((row) => (row.id === o.id ? (json.order as Order) : row)));
+    toast.success("Order cancelled", `${o.id} won't be printed.`);
+  }
+
+  async function deleteOrder(o: Order) {
+    const ok = await confirm({
+      title: `Delete order ${o.id}?`,
+      message: "The order and its uploaded file will be removed from your list. This can't be undone.",
+      confirmLabel: "Delete order",
+      tone: "danger",
+    });
+    if (!ok) return;
+    setBusyId(o.id);
+    const res = await fetch(`/api/orders/${o.id}`, { method: "DELETE" });
+    const json = await res.json().catch(() => ({}));
+    setBusyId(null);
+    if (!res.ok) {
+      toast.error("Couldn't delete the order", json.error);
+      await loadOrders();
+      return;
+    }
+    setOrders((prev) => prev.filter((row) => row.id !== o.id));
+    toast.success("Order deleted", o.id);
   }
 
   async function refreshConfirm(orderId: string) {
@@ -222,9 +284,44 @@ export default function UserOrdersPage() {
     );
   }
 
+  const exportSpec = (): ExportSpec<Order> => ({
+    filename: "my-print-orders",
+    title: "My print orders",
+    sheetName: "Orders",
+    rows: orders,
+    columns: [
+      { header: "Order", value: (o) => o.id, width: 20 },
+      { header: "Date", value: (o) => o.created_at, type: "datetime", width: 18 },
+      { header: "File", value: (o) => o.file_name, width: 32 },
+      { header: "Type", value: (o) => `${o.type}/${o.color}`, width: 14 },
+      { header: "Pages", value: (o) => o.pages, type: "number", width: 8 },
+      { header: "Copies", value: (o) => o.copies, type: "number", width: 8 },
+      { header: "Amount", value: (o) => o.amount, type: "currency", width: 12 },
+      { header: "Payment", value: (o) => (o.payment_status === "pending" ? "unpaid" : o.payment_status), width: 10 },
+      { header: "Status", value: (o) => o.status.replace("_", " "), width: 12 },
+    ],
+    summary: [
+      { label: "Orders", value: String(orders.length) },
+      {
+        label: "Total paid",
+        value: formatPHP(
+          orders
+            .filter((o) => o.payment_status === "paid")
+            .reduce((s, o) => s + Number(o.amount || 0), 0)
+        ),
+      },
+    ],
+  });
+
   return (
     <div className="space-y-3">
       {bannerEl}
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-sm text-pp-muted">
+          {orders.length} order{orders.length === 1 ? "" : "s"}
+        </p>
+        <ExportMenu getSpec={exportSpec} />
+      </div>
       {orders.map((o) => (
         <div
           key={o.id}
@@ -250,24 +347,46 @@ export default function UserOrdersPage() {
                 pay: {o.payment_status}
               </span>
               <span className="font-semibold text-pp-accent">{formatPHP(o.amount)}</span>
-              {o.payment_status !== "paid" && (
+              {o.payment_status !== "paid" && o.status !== "cancelled" && (
                 <>
                   <button
                     type="button"
                     disabled={confirming}
                     onClick={() => refreshConfirm(o.id)}
-                    className="min-h-9 rounded-lg border border-pp-border bg-white text-sm px-3 font-medium disabled:opacity-50"
+                    className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-white px-2.5 text-xs font-semibold text-pp-primary ring-1 ring-inset ring-pp-border hover:bg-slate-50 disabled:opacity-50"
                   >
+                    <RefreshCw className={`h-4 w-4 ${confirming ? "animate-spin" : ""}`} aria-hidden />
                     Check payment
                   </button>
                   <button
                     type="button"
                     onClick={() => payAgain(o.id)}
-                    className="min-h-9 rounded-lg bg-pp-accent text-white text-sm px-3 font-medium"
+                    className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-pp-accent px-3 text-xs font-semibold text-white hover:bg-pp-accent-hover"
                   >
+                    <CreditCard className="h-4 w-4" aria-hidden />
                     Pay now
                   </button>
                 </>
+              )}
+              {o.payment_status !== "paid" && (o.status === "pending" || o.status === "cancelled") && (
+                <RowActions align="start" wrap>
+                  {o.status === "pending" && (
+                    <RowAction
+                      kind="cancel"
+                      label="Cancel order"
+                      showLabel
+                      disabled={busyId === o.id}
+                      onClick={() => void cancelOrder(o)}
+                    />
+                  )}
+                  <RowAction
+                    kind="delete"
+                    label="Delete order"
+                    showLabel
+                    disabled={busyId === o.id}
+                    onClick={() => void deleteOrder(o)}
+                  />
+                </RowActions>
               )}
             </div>
           </div>
@@ -276,6 +395,7 @@ export default function UserOrdersPage() {
               orderId={o.id}
               fileName={o.file_name}
               hasFile={!!o.file_path}
+              readOnly={o.payment_status === "paid" || o.status === "cancelled"}
               onDeleted={() =>
                 setOrders((prev) =>
                   prev.map((row) =>

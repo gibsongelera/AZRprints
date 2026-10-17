@@ -114,13 +114,7 @@ export async function POST(request: Request) {
       .eq("id", order.id);
 
     await enqueuePrintJobForOrder(admin, order.id);
-
-    await admin.from("notifications").insert({
-      user_id: null,
-      type: "success",
-      title: "Payment received",
-      message: `PayMongo payment confirmed for ${order.id}.`,
-    });
+    // Student + admin notifications come from the notify_order_events trigger (migration 004).
   }
 
   if (eventType === "payment.failed" || eventType === "link.payment.failed") {

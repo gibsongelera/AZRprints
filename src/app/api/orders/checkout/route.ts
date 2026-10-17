@@ -1,5 +1,11 @@
 import { NextResponse } from "next/server";
-import { createCheckoutSession, createPaymentLink } from "@/lib/paymongo";
+import { recordPayment } from "@/lib/order-actions";
+import {
+  createCheckoutSession,
+  createPaymentLink,
+  getPaymongoCheckoutState,
+} from "@/lib/paymongo";
+import { serviceClientOrError } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
@@ -46,12 +52,40 @@ export async function POST(request: Request) {
     if (order.payment_status === "paid") {
       return NextResponse.json({ error: "Order already paid" }, { status: 400 });
     }
+    if (order.status === "cancelled") {
+      return NextResponse.json(
+        { error: "This order was cancelled. Place a new order to print this file." },
+        { status: 400 }
+      );
+    }
 
+    // Payment fields are locked for students (migration 004), so the server
+    // writes them with the service role after the ownership check above.
+    const privileged = serviceClientOrError("start PayMongo checkout");
+    if ("error" in privileged) return privileged.error;
+
+    // Reuse the saved checkout only while PayMongo can still take payment on
+    // it. Old sessions expire or can't be loaded any more (PayMongo's page
+    // then shows "An error occurred in the Server Components render").
     if (order.paymongo_checkout_url && order.paymongo_link_id) {
-      return NextResponse.json({
-        checkoutUrl: order.paymongo_checkout_url,
-        linkId: order.paymongo_link_id,
-      });
+      const state = await getPaymongoCheckoutState(order.paymongo_link_id);
+      if (state === "open") {
+        return NextResponse.json({
+          checkoutUrl: order.paymongo_checkout_url,
+          linkId: order.paymongo_link_id,
+        });
+      }
+      if (state === "paid") {
+        await recordPayment(privileged.admin, order.id);
+        return NextResponse.json(
+          {
+            error: "PayMongo shows this order as already paid. It's now in the print queue.",
+            paid: true,
+          },
+          { status: 409 }
+        );
+      }
+      // "closed": fall through and start a fresh checkout for this order.
     }
 
     const appUrl =
@@ -86,7 +120,7 @@ export async function POST(request: Request) {
       }
     }
 
-    const { error: updateError } = await supabase
+    const { error: updateError } = await privileged.admin
       .from("orders")
       .update({
         paymongo_link_id: link.id,

@@ -22,7 +22,7 @@ async function getAuthorizedOrder(orderId: string) {
 
   const { data: order } = await supabase
     .from("orders")
-    .select("id, user_id, file_name, file_path")
+    .select("id, user_id, file_name, file_path, payment_status")
     .eq("id", orderId)
     .maybeSingle();
 
@@ -39,6 +39,18 @@ async function getAuthorizedOrder(orderId: string) {
   }
 
   return { supabase, user, isAdmin, order };
+}
+
+/** Students can't change the file once the order is paid (the price was set from it). */
+function lockedForStudent(order: { payment_status: string }, isAdmin: boolean) {
+  if (isAdmin || order.payment_status !== "paid") return null;
+  return NextResponse.json(
+    {
+      error:
+        "This order is already paid, so its file can't be changed. Open a support ticket if you need a different file.",
+    },
+    { status: 409 }
+  );
 }
 
 export async function GET(
@@ -85,10 +97,12 @@ export async function DELETE(
   const auth = await getAuthorizedOrder(id);
   if ("error" in auth && auth.error) return auth.error;
 
-  const { order, supabase } = auth;
+  const { order, supabase, isAdmin } = auth;
   if (!order.file_path) {
     return NextResponse.json({ error: "No file on this order" }, { status: 404 });
   }
+  const locked = lockedForStudent(order, isAdmin);
+  if (locked) return locked;
 
   const { error: storageError } = await supabase.storage
     .from("order-files")
@@ -120,7 +134,9 @@ export async function PUT(
   const auth = await getAuthorizedOrder(id);
   if ("error" in auth && auth.error) return auth.error;
 
-  const { order, supabase, user } = auth;
+  const { order, supabase, user, isAdmin } = auth;
+  const locked = lockedForStudent(order, isAdmin);
+  if (locked) return locked;
 
   const form = await request.formData();
   const file = form.get("file");
