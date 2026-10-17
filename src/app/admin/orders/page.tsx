@@ -1,11 +1,12 @@
 "use client";
 
-import { Search, Trash2 } from "lucide-react";
+import { Search } from "lucide-react";
 import { useEffect, useState } from "react";
 import { ExportMenu } from "@/components/ExportMenu";
 import { OrderDetailsModal } from "@/components/OrderDetailsModal";
 import { OrderFileActions } from "@/components/OrderFileActions";
 import { useConfirm, useToast } from "@/components/ui/feedback";
+import { RowAction, RowActions } from "@/components/ui/RowActions";
 import type { ExportSpec } from "@/lib/export";
 import { formatPHP } from "@/lib/format";
 import {
@@ -220,8 +221,7 @@ export default function AdminOrdersPage() {
                 <th className="px-3 py-2 text-right">Amount</th>
                 <th className="px-3 py-2">Payment</th>
                 <th className="px-3 py-2">Job status</th>
-                <th className="px-3 py-2">File actions</th>
-                <th className="px-3 py-2"><span className="sr-only">Manage</span></th>
+                <th className="px-3 py-2 text-right">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -253,44 +253,34 @@ export default function AdminOrdersPage() {
                     </select>
                   </td>
                   <td className="px-3 py-2">
-                    <OrderFileActions
-                      orderId={o.id}
-                      fileName={o.file_name}
-                      hasFile={!!o.file_path}
-                      compact
-                      onDeleted={() =>
-                        setOrders((prev) =>
-                          prev.map((row) => (row.id === o.id ? { ...row, file_path: null } : row))
-                        )
-                      }
-                      onReplaced={reload}
-                    />
-                  </td>
-                  <td className="px-3 py-2">
-                    <div className="flex items-center gap-1">
-                      <button
-                        type="button"
+                    {/* File replace/delete live in Details and on Order Files. */}
+                    <RowActions>
+                      <OrderFileActions
+                        orderId={o.id}
+                        fileName={o.file_name}
+                        hasFile={!!o.file_path}
+                        compact
+                        readOnly
+                      />
+                      <RowAction
+                        kind="details"
+                        label="Order details"
+                        ariaLabel={`Details for order ${o.id}`}
                         onClick={() => setDetailsId(o.id)}
-                        className="min-h-8 rounded-lg border border-pp-border bg-white px-2.5 text-xs font-semibold hover:bg-slate-50"
-                      >
-                        Details
-                      </button>
-                      <button
-                        type="button"
+                      />
+                      <RowAction
+                        kind="delete"
+                        label="Delete order"
+                        ariaLabel={`Delete order ${o.id}`}
                         onClick={() => void deleteOrder(o)}
-                        aria-label={`Delete order ${o.id}`}
-                        title="Delete order"
-                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-pp-muted hover:bg-red-50 hover:text-red-600"
-                      >
-                        <Trash2 className="h-4 w-4" aria-hidden />
-                      </button>
-                    </div>
+                      />
+                    </RowActions>
                   </td>
                 </tr>
               ))}
               {!visible.length && (
                 <tr>
-                  <td colSpan={9} className="px-3 py-8 text-center text-pp-muted">
+                  <td colSpan={8} className="px-3 py-8 text-center text-pp-muted">
                     {orders.length ? "No orders match these filters." : "No orders yet."}
                   </td>
                 </tr>

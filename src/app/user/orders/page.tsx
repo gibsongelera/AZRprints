@@ -1,9 +1,11 @@
 "use client";
 
+import { CreditCard, RefreshCw } from "lucide-react";
 import { useEffect, useState } from "react";
 import { ExportMenu } from "@/components/ExportMenu";
 import { OrderFileActions } from "@/components/OrderFileActions";
 import { useConfirm, useToast } from "@/components/ui/feedback";
+import { RowAction, RowActions } from "@/components/ui/RowActions";
 import type { ExportSpec } from "@/lib/export";
 import { formatPHP } from "@/lib/format";
 import { createClient } from "@/lib/supabase/client";
@@ -346,38 +348,40 @@ export default function UserOrdersPage() {
                     type="button"
                     disabled={confirming}
                     onClick={() => refreshConfirm(o.id)}
-                    className="min-h-9 rounded-lg border border-pp-border bg-white text-sm px-3 font-medium disabled:opacity-50"
+                    className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-white px-2.5 text-xs font-semibold text-pp-primary ring-1 ring-inset ring-pp-border hover:bg-slate-50 disabled:opacity-50"
                   >
+                    <RefreshCw className={`h-4 w-4 ${confirming ? "animate-spin" : ""}`} aria-hidden />
                     Check payment
                   </button>
                   <button
                     type="button"
                     onClick={() => payAgain(o.id)}
-                    className="min-h-9 rounded-lg bg-pp-accent text-white text-sm px-3 font-medium"
+                    className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-pp-accent px-3 text-xs font-semibold text-white hover:bg-pp-accent-hover"
                   >
+                    <CreditCard className="h-4 w-4" aria-hidden />
                     Pay now
                   </button>
                 </>
               )}
-              {o.payment_status !== "paid" && o.status === "pending" && (
-                <button
-                  type="button"
-                  disabled={busyId === o.id}
-                  onClick={() => void cancelOrder(o)}
-                  className="min-h-9 rounded-lg border border-pp-border bg-white text-sm px-3 font-medium disabled:opacity-50"
-                >
-                  Cancel order
-                </button>
-              )}
               {o.payment_status !== "paid" && (o.status === "pending" || o.status === "cancelled") && (
-                <button
-                  type="button"
-                  disabled={busyId === o.id}
-                  onClick={() => void deleteOrder(o)}
-                  className="min-h-9 rounded-lg border border-red-200 bg-white text-sm px-3 font-medium text-red-700 hover:bg-red-50 disabled:opacity-50"
-                >
-                  Delete
-                </button>
+                <RowActions align="start" wrap>
+                  {o.status === "pending" && (
+                    <RowAction
+                      kind="cancel"
+                      label="Cancel order"
+                      showLabel
+                      disabled={busyId === o.id}
+                      onClick={() => void cancelOrder(o)}
+                    />
+                  )}
+                  <RowAction
+                    kind="delete"
+                    label="Delete order"
+                    showLabel
+                    disabled={busyId === o.id}
+                    onClick={() => void deleteOrder(o)}
+                  />
+                </RowActions>
               )}
             </div>
           </div>

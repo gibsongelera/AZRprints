@@ -1,8 +1,9 @@
 "use client";
 
-import { RefreshCw, RotateCcw, Trash2, X } from "lucide-react";
+import { RefreshCw } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useConfirm, useToast } from "@/components/ui/feedback";
+import { RowAction, RowActions } from "@/components/ui/RowActions";
 import { isActiveJob, PRINT_JOB_LABEL, printJobBadge } from "@/lib/print-jobs";
 import type { PrintJob, PrintJobStatus } from "@/lib/types";
 
@@ -99,8 +100,6 @@ export function PrintQueue() {
   }
 
   const visible = filter === "all" ? jobs : jobs.filter((j) => j.status === filter);
-  const iconBtn =
-    "inline-flex h-8 items-center gap-1 rounded-lg px-2 text-xs font-semibold disabled:opacity-50";
 
   return (
     <section className="rounded-xl border border-pp-border bg-white overflow-hidden">
@@ -154,7 +153,7 @@ export function PrintQueue() {
               <th className="px-3 py-2 font-medium">Status</th>
               <th className="px-3 py-2 font-medium text-right">Tries</th>
               <th className="px-3 py-2 font-medium">Queued</th>
-              <th className="px-3 py-2"><span className="sr-only">Actions</span></th>
+              <th className="px-3 py-2 text-right font-medium">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -184,41 +183,38 @@ export function PrintQueue() {
                     {new Date(j.created_at).toLocaleString()}
                   </td>
                   <td className="px-3 py-2">
-                    <div className="flex justify-end gap-1">
+                    <RowActions>
                       {!isActiveJob(j.status) && (
-                        <button
-                          type="button"
-                          disabled={busy}
+                        <RowAction
+                          kind="retry"
+                          label={j.status === "completed" ? "Print again" : "Retry"}
+                          ariaLabel={`${j.status === "completed" ? "Print again" : "Retry"} ${j.orders?.id || j.order_id}`}
+                          busy={busy}
                           onClick={() => void act(j, "retry")}
-                          className={`${iconBtn} text-pp-primary hover:bg-slate-100`}
-                        >
-                          <RotateCcw className="h-3.5 w-3.5" aria-hidden />
-                          {j.status === "completed" ? "Print again" : "Retry"}
-                        </button>
+                        />
                       )}
                       {j.status === "queued" && (
-                        <button
-                          type="button"
-                          disabled={busy}
+                        <RowAction
+                          kind="cancel"
+                          label="Cancel job"
+                          ariaLabel={`Cancel print job for ${j.orders?.id || j.order_id}`}
+                          busy={busy}
                           onClick={() => void act(j, "cancel")}
-                          className={`${iconBtn} text-amber-800 hover:bg-amber-50`}
-                        >
-                          <X className="h-3.5 w-3.5" aria-hidden />
-                          Cancel
-                        </button>
+                        />
                       )}
                       {!isActiveJob(j.status) && (
-                        <button
-                          type="button"
+                        <RowAction
+                          kind="delete"
+                          label="Delete job"
+                          ariaLabel={`Delete print job for ${j.orders?.id || j.order_id}`}
                           disabled={busy}
                           onClick={() => void remove(j)}
-                          aria-label={`Delete print job for ${j.orders?.id || j.order_id}`}
-                          className={`${iconBtn} text-pp-muted hover:bg-red-50 hover:text-red-600`}
-                        >
-                          <Trash2 className="h-3.5 w-3.5" aria-hidden />
-                        </button>
+                        />
                       )}
-                    </div>
+                      {j.status === "printing" && (
+                        <span className="text-xs text-pp-muted">Printing…</span>
+                      )}
+                    </RowActions>
                   </td>
                 </tr>
               );

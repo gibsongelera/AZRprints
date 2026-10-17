@@ -149,7 +149,7 @@ export default function AdminFilesPage() {
                 <th className="px-3 py-2">File</th>
                 <th className="px-3 py-2">Amount</th>
                 <th className="px-3 py-2">Uploaded</th>
-                <th className="px-3 py-2">Actions</th>
+                <th className="px-3 py-2 text-right">Actions</th>
               </tr>
             </thead>
             <tbody>

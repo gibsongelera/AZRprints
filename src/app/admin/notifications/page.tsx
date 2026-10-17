@@ -1,10 +1,11 @@
 "use client";
 
-import { Megaphone, Pencil, Trash2 } from "lucide-react";
+import { Megaphone, Pencil } from "lucide-react";
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { NotificationIcon } from "@/components/NotificationIcon";
 import { NotificationInbox } from "@/components/NotificationInbox";
 import { useConfirm, useToast } from "@/components/ui/feedback";
+import { RowAction, RowActions } from "@/components/ui/RowActions";
 import { createClient } from "@/lib/supabase/client";
 import type { Notification, NotificationAudience } from "@/lib/types";
 
@@ -224,22 +225,22 @@ function Announcements() {
                 {new Date(n.created_at).toLocaleString()}
               </p>
             </div>
-            <button
-              type="button"
-              onClick={() => startEdit(n)}
-              aria-label={`Edit announcement ${n.title}`}
-              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-pp-muted hover:bg-slate-100 hover:text-pp-primary"
-            >
-              <Pencil className="h-4 w-4" aria-hidden />
-            </button>
-            <button
-              type="button"
-              onClick={() => void onDelete(n)}
-              aria-label={`Delete announcement ${n.title}`}
-              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-pp-muted hover:bg-red-50 hover:text-red-600"
-            >
-              <Trash2 className="h-4 w-4" aria-hidden />
-            </button>
+            <div className="shrink-0 self-start">
+              <RowActions>
+                <RowAction
+                  kind="edit"
+                  label="Edit announcement"
+                  ariaLabel={`Edit announcement ${n.title}`}
+                  onClick={() => startEdit(n)}
+                />
+                <RowAction
+                  kind="delete"
+                  label="Delete announcement"
+                  ariaLabel={`Delete announcement ${n.title}`}
+                  onClick={() => void onDelete(n)}
+                />
+              </RowActions>
+            </div>
           </div>
         ))}
         {!loading && !items.length && (

@@ -3,6 +3,7 @@
 import { Search, UserPlus } from "lucide-react";
 import { FormEvent, useEffect, useState } from "react";
 import { ExportMenu } from "@/components/ExportMenu";
+import { RowAction, RowActions } from "@/components/ui/RowActions";
 import { useConfirm, useToast } from "@/components/ui/feedback";
 import type { ExportSpec } from "@/lib/export";
 import type { Profile, UserRole } from "@/lib/types";
@@ -245,7 +246,7 @@ export default function AdminUsersPage() {
                 <th className="px-3 py-2">ZPPSU ID</th>
                 <th className="px-3 py-2">College / Dept</th>
                 <th className="px-3 py-2">Phone</th>
-                <th className="px-3 py-2 w-32">Actions</th>
+                <th className="px-3 py-2 text-right">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -260,22 +261,20 @@ export default function AdminUsersPage() {
                   </td>
                   <td className="px-3 py-2">{u.phone || "—"}</td>
                   <td className="px-3 py-2">
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
+                    <RowActions>
+                      <RowAction
+                        kind="edit"
+                        label="Edit user"
+                        ariaLabel={`Edit ${u.name || u.email || "user"}`}
                         onClick={() => openEdit(u)}
-                        className="text-pp-accent font-medium hover:underline"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        type="button"
+                      />
+                      <RowAction
+                        kind="delete"
+                        label="Delete user"
+                        ariaLabel={`Delete ${u.name || u.email || "user"}`}
                         onClick={() => void onDelete(u)}
-                        className="text-red-600 font-medium hover:underline"
-                      >
-                        Delete
-                      </button>
-                    </div>
+                      />
+                    </RowActions>
                   </td>
                 </tr>
               ))}

@@ -1,12 +1,13 @@
 "use client";
 
-import { Paperclip, Pencil, Send, Trash2 } from "lucide-react";
+import { Paperclip, Send } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { PendingFile, TicketAttachment } from "@/components/TicketAttachment";
 import { useConfirm, useToast } from "@/components/ui/feedback";
 import { Modal } from "@/components/ui/Modal";
+import { RowAction, RowActions } from "@/components/ui/RowActions";
 import { createClient } from "@/lib/supabase/client";
 import {
   TICKET_FILE_ACCEPT,
@@ -44,9 +45,6 @@ export const STATUS_LABELS: Record<TicketStatus, string> = {
   resolved: "Resolved",
   closed: "Closed",
 };
-
-const smallBtn =
-  "inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-pp-border bg-white px-3 text-sm font-medium hover:bg-slate-50 disabled:opacity-50";
 
 /**
  * Live chat thread for one ticket. Mount with key={ticketId} so switching
@@ -402,55 +400,54 @@ export function TicketThread({
                 </option>
               ))}
             </select>
-            <button
-              type="button"
-              disabled={ticketBusy}
-              onClick={() => void deleteTicket()}
-              className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-red-200 bg-white px-3 text-sm font-medium text-red-700 hover:bg-red-50 disabled:opacity-50 sm:ml-auto"
-            >
-              <Trash2 className="h-4 w-4" aria-hidden />
-              Delete ticket
-            </button>
+            <div className="flex items-center sm:ml-auto">
+              <RowAction
+                kind="delete"
+                label="Delete ticket"
+                showLabel
+                busy={ticketBusy}
+                onClick={() => void deleteTicket()}
+              />
+            </div>
           </div>
         )}
 
         {isOwner && (
-          <div className="flex flex-wrap gap-2">
-            <button type="button" disabled={ticketBusy} onClick={openEditTicket} className={smallBtn}>
-              <Pencil className="h-4 w-4" aria-hidden />
-              Edit ticket
-            </button>
+          <RowActions align="start" wrap>
+            <RowAction
+              kind="edit"
+              label="Edit ticket"
+              showLabel
+              disabled={ticketBusy}
+              onClick={openEditTicket}
+            />
             {ticket.status === "closed" ? (
-              <button
-                type="button"
+              <RowAction
+                kind="reopen"
+                label="Reopen ticket"
+                showLabel
                 disabled={ticketBusy}
                 onClick={() => void patchOwnTicket({ status: "open" }, "Ticket reopened")}
-                className={smallBtn}
-              >
-                Reopen ticket
-              </button>
+              />
             ) : (
-              <button
-                type="button"
+              <RowAction
+                kind="close"
+                label="Close ticket"
+                showLabel
                 disabled={ticketBusy}
                 onClick={() => void patchOwnTicket({ status: "closed" }, "Ticket closed")}
-                className={smallBtn}
-              >
-                Close ticket
-              </button>
+              />
             )}
             {!hasStaffReply && (
-              <button
-                type="button"
+              <RowAction
+                kind="delete"
+                label="Delete ticket"
+                showLabel
                 disabled={ticketBusy}
                 onClick={() => void deleteTicket()}
-                className={`${smallBtn} border-red-200 text-red-700 hover:bg-red-50`}
-              >
-                <Trash2 className="h-4 w-4" aria-hidden />
-                Delete ticket
-              </button>
+              />
             )}
-          </div>
+          </RowActions>
         )}
       </div>
 
@@ -524,31 +521,25 @@ export function TicketThread({
                 </p>
               </div>
               {!editing && (ownMessage || canDelete) && (
-                <div className="mt-0.5 flex gap-1">
-                  {ownMessage && (
-                    <button
-                      type="button"
-                      disabled={busy}
-                      onClick={() => startEdit(m)}
-                      aria-label="Edit message"
-                      className="inline-flex h-7 items-center gap-1 rounded-md px-1.5 text-[11px] font-medium text-pp-muted hover:bg-slate-100 hover:text-pp-primary disabled:opacity-50"
-                    >
-                      <Pencil className="h-3.5 w-3.5" aria-hidden />
-                      Edit
-                    </button>
-                  )}
-                  {canDelete && (
-                    <button
-                      type="button"
-                      disabled={busy}
-                      onClick={() => void deleteMessage(m)}
-                      aria-label="Delete message"
-                      className="inline-flex h-7 items-center gap-1 rounded-md px-1.5 text-[11px] font-medium text-pp-muted hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" aria-hidden />
-                      Delete
-                    </button>
-                  )}
+                <div className="mt-1">
+                  <RowActions align={mine ? "end" : "start"}>
+                    {ownMessage && (
+                      <RowAction
+                        kind="edit"
+                        label="Edit message"
+                        disabled={busy}
+                        onClick={() => startEdit(m)}
+                      />
+                    )}
+                    {canDelete && (
+                      <RowAction
+                        kind="delete"
+                        label="Delete message"
+                        busy={busy}
+                        onClick={() => void deleteMessage(m)}
+                      />
+                    )}
+                  </RowActions>
                 </div>
               )}
             </div>

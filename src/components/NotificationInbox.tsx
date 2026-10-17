@@ -1,10 +1,11 @@
 "use client";
 
-import { CheckCheck, Trash2 } from "lucide-react";
+import { CheckCheck } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { NotificationIcon } from "@/components/NotificationIcon";
 import { useConfirm, useToast } from "@/components/ui/feedback";
+import { RowAction } from "@/components/ui/RowActions";
 import {
   deleteOwnNotification,
   fetchInbox,
@@ -149,15 +150,14 @@ export function NotificationInbox({ role }: { role: UserRole }) {
                 )}
               </button>
               {n.user_id === userId && (
-                <button
-                  type="button"
-                  onClick={() => void remove(n)}
-                  aria-label={`Delete notification ${n.title}`}
-                  title="Delete"
-                  className="m-2 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-pp-muted hover:bg-red-50 hover:text-red-600"
-                >
-                  <Trash2 className="h-4 w-4" aria-hidden />
-                </button>
+                <div className="shrink-0 p-3">
+                  <RowAction
+                    kind="delete"
+                    label="Delete notification"
+                    ariaLabel={`Delete notification ${n.title}`}
+                    onClick={() => void remove(n)}
+                  />
+                </div>
               )}
             </li>
           );
