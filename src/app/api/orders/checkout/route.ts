@@ -1,5 +1,10 @@
 import { NextResponse } from "next/server";
-import { createCheckoutSession, createPaymentLink } from "@/lib/paymongo";
+import { recordPayment } from "@/lib/order-actions";
+import {
+  createCheckoutSession,
+  createPaymentLink,
+  getPaymongoCheckoutState,
+} from "@/lib/paymongo";
 import { serviceClientOrError } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
@@ -59,11 +64,28 @@ export async function POST(request: Request) {
     const privileged = serviceClientOrError("start PayMongo checkout");
     if ("error" in privileged) return privileged.error;
 
+    // Reuse the saved checkout only while PayMongo can still take payment on
+    // it. Old sessions expire or can't be loaded any more (PayMongo's page
+    // then shows "An error occurred in the Server Components render").
     if (order.paymongo_checkout_url && order.paymongo_link_id) {
-      return NextResponse.json({
-        checkoutUrl: order.paymongo_checkout_url,
-        linkId: order.paymongo_link_id,
-      });
+      const state = await getPaymongoCheckoutState(order.paymongo_link_id);
+      if (state === "open") {
+        return NextResponse.json({
+          checkoutUrl: order.paymongo_checkout_url,
+          linkId: order.paymongo_link_id,
+        });
+      }
+      if (state === "paid") {
+        await recordPayment(privileged.admin, order.id);
+        return NextResponse.json(
+          {
+            error: "PayMongo shows this order as already paid. It's now in the print queue.",
+            paid: true,
+          },
+          { status: 409 }
+        );
+      }
+      // "closed": fall through and start a fresh checkout for this order.
     }
 
     const appUrl =

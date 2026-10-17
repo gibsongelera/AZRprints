@@ -25,16 +25,21 @@ export async function closeCheckoutOrRecordPayment(
   }
 
   if (paid) {
-    await admin
-      .from("orders")
-      .update({ payment_status: "paid", status: "in_progress" })
-      .eq("id", order.id);
-    await enqueuePrintJobForOrder(admin, order.id);
+    await recordPayment(admin, order.id);
     return true;
   }
 
   await closePaymongoResource(order.paymongo_link_id);
   return false;
+}
+
+/** PayMongo confirmed the payment: mark the order paid and queue it for printing. */
+export async function recordPayment(admin: SupabaseClient, orderId: string) {
+  await admin
+    .from("orders")
+    .update({ payment_status: "paid", status: "in_progress" })
+    .eq("id", orderId);
+  await enqueuePrintJobForOrder(admin, orderId);
 }
 
 export const PAID_MEANWHILE =

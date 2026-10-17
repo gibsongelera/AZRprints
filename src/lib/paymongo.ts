@@ -204,8 +204,42 @@ export async function isPaymongoResourcePaid(
     throw new Error(msg);
   }
 
-  const attrs = json?.data?.attributes || {};
+  return attributesShowPaid(json?.data?.attributes || {});
+}
 
+export type CheckoutState = "open" | "paid" | "closed";
+
+/**
+ * Whether a saved checkout can still be paid ("open"), was paid ("paid"), or
+ * must be replaced ("closed": expired, archived, or no longer loadable —
+ * PayMongo's hosted page crashes on very old sessions).
+ */
+export async function getPaymongoCheckoutState(resourceId: string): Promise<CheckoutState> {
+  const id = (resourceId || "").trim();
+  if (!id) return "closed";
+  const isLink = id.startsWith("link_");
+  let res: Response;
+  try {
+    res = await fetch(`${PAYMONGO_API}${isLink ? `/links/${id}` : `/checkout_sessions/${id}`}`, {
+      method: "GET",
+      headers: { Authorization: authHeader(), Accept: "application/json" },
+      cache: "no-store",
+    });
+  } catch {
+    return "closed";
+  }
+  if (!res.ok) return "closed";
+
+  const json = await res.json().catch(() => ({}));
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const attrs: Record<string, any> = json?.data?.attributes || {};
+  if (attributesShowPaid(attrs)) return "paid";
+  if (isLink) return attrs.status === "unpaid" && !attrs.archived ? "open" : "closed";
+  return String(attrs.status || "").toLowerCase() === "active" ? "open" : "closed";
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function attributesShowPaid(attrs: Record<string, any>): boolean {
   // Payment Links expose a top-level status.
   if (typeof attrs.status === "string") {
     const status = attrs.status.toLowerCase();

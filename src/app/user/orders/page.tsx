@@ -147,11 +147,16 @@ export default function UserOrdersPage() {
       body: JSON.stringify({ orderId }),
     });
     const text = await res.text();
-    let json: { error?: string; checkoutUrl?: string } = {};
+    let json: { error?: string; checkoutUrl?: string; paid?: boolean } = {};
     try {
       json = text ? JSON.parse(text) : {};
     } catch {
       toast.error("Checkout failed", `The server answered ${res.status}. Try again in a moment.`);
+      return;
+    }
+    if (json.paid) {
+      toast.success("Already paid", json.error);
+      await loadOrders();
       return;
     }
     if (res.ok && json.checkoutUrl) {
